@@ -32,6 +32,14 @@ npm run qa:showcase:screenshots
 
 Screenshots are written to `output/playwright/`. This directory is a local QA artifact and should not be committed.
 
+Run the repeatable interaction check for the Provider Demo flow:
+
+```bash
+npm run qa:showcase:interactions
+```
+
+The script verifies `/showcase`, Provider Demo source switching, Stop provider, Clear to idle, and console/page errors. It starts a local Vite server if one is not already available.
+
 ## Required Viewports
 
 - 1366 x 768

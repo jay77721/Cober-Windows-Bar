@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "qa": "npm run test:state && npm run test:providers && npm run build",
     "qa:showcase:screenshots": "npx playwright screenshot --viewport-size=1366,768 http://127.0.0.1:5173/showcase output/playwright/showcase-1366.png && npx playwright screenshot --viewport-size=1440,900 http://127.0.0.1:5173/showcase output/playwright/showcase-1440.png && npx playwright screenshot --viewport-size=1920,1080 http://127.0.0.1:5173/showcase output/playwright/showcase-1920.png",
+    "qa:showcase:interactions": "node scripts/qa-showcase-interactions.mjs",
     "test:state": "tsx src/state/hubState.test.ts",
     "test:providers": "tsx src/providers/provider.test.ts",
     "preview": "vite preview"

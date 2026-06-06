@@ -50,6 +50,11 @@ export function ShowcasePage() {
     setActiveProviderLabel(undefined);
   }, []);
 
+  const stopAutoDemo = useCallback(() => {
+    clearDemoTimers();
+    setIsAutoRunning(false);
+  }, [clearDemoTimers]);
+
   const createProviderDemo = useCallback((id: ProviderDemoId) => {
     const options = { now: () => Date.now() };
     const providerById: Record<ProviderDemoId, () => HubProvider> = {
@@ -64,8 +69,7 @@ export function ShowcasePage() {
 
   const triggerProviderDemo = useCallback(
     (id: ProviderDemoId) => {
-      clearDemoTimers();
-      setIsAutoRunning(false);
+      stopAutoDemo();
       stopProviderDemo();
 
       const provider = createProviderDemo(id);
@@ -74,17 +78,16 @@ export function ShowcasePage() {
       setActiveProviderLabel(provider.label);
       provider.start();
     },
-    [clearDemoTimers, createProviderDemo, eventBus, stopProviderDemo],
+    [createProviderDemo, eventBus, stopAutoDemo, stopProviderDemo],
   );
 
   const playScenario = useCallback(
     (id: HubDemoScenarioId) => {
-      clearDemoTimers();
+      stopAutoDemo();
       stopProviderDemo();
-      setIsAutoRunning(false);
       playHubDemoScenario(eventBus, createHubDemoScenario(id, Date.now()), Date.now());
     },
-    [clearDemoTimers, eventBus, stopProviderDemo],
+    [eventBus, stopAutoDemo, stopProviderDemo],
   );
 
   const handleModeChange = useCallback(
@@ -125,6 +128,11 @@ export function ShowcasePage() {
       delay += step.durationMs;
     });
   }, [clearDemoTimers, eventBus, stopProviderDemo]);
+
+  const clearProviderDemo = useCallback(() => {
+    stopProviderDemo();
+    playHubDemoScenario(eventBus, createHubDemoScenario("idle", Date.now()), Date.now());
+  }, [eventBus, stopProviderDemo]);
 
   useEffect(() => {
     return eventBus.subscribe(setStoreState);
@@ -205,10 +213,7 @@ export function ShowcasePage() {
                 onProviderDownload={() => triggerProviderDemo("download")}
                 onProviderNotification={() => triggerProviderDemo("notification")}
                 onProviderStop={stopProviderDemo}
-                onProviderClear={() => {
-                  stopProviderDemo();
-                  eventBus.clearHubEvents();
-                }}
+                onProviderClear={clearProviderDemo}
               />
 
               <StatusFlow activeMode={activeMode} />

@@ -172,15 +172,15 @@ export function EventPlaygroundPanel({
             <div className="mr-1 min-w-[124px]">
               <div className="text-xs font-semibold uppercase tracking-normal text-slate-400">Provider Demo</div>
               <div className="truncate text-[12px] leading-4 text-slate-300">
-                {activeProviderLabel ?? "Stopped"}
+                {activeProviderLabel ?? "Stopped, events stay"}
               </div>
             </div>
             <ProviderButton label="Music" icon={Music2} onClick={onProviderMusic} tone="rose" />
             <ProviderButton label="AI" icon={Bot} onClick={onProviderAi} tone="sky" />
             <ProviderButton label="Download" icon={Download} onClick={onProviderDownload} tone="emerald" />
             <ProviderButton label="Notify" icon={Bell} onClick={onProviderNotification} tone="amber" />
-            <ProviderButton label="Stop" icon={CircleStop} onClick={onProviderStop} tone="slate" />
-            <ProviderButton label="Clear" icon={Trash2} onClick={onProviderClear} tone="slate" />
+            <ProviderButton label="Stop provider" icon={CircleStop} onClick={onProviderStop} tone="slate" />
+            <ProviderButton label="Clear to idle" icon={Trash2} onClick={onProviderClear} tone="slate" />
             <span
               className={`ml-auto rounded-full border px-2.5 py-1 text-xs font-semibold ${
                 activeProviderLabel
@@ -188,7 +188,7 @@ export function EventPlaygroundPanel({
                   : "border-white/10 bg-white/[0.055] text-slate-300"
               }`}
             >
-              {activeProviderLabel ? "Running" : "Stopped"}
+              {activeProviderLabel ? "Provider running" : "Provider stopped"}
             </span>
           </div>
         </div>
