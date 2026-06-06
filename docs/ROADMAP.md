@@ -19,7 +19,7 @@ Delivered:
 
 Goal: prove the status flow is reasonable and the hub can move.
 
-Status: current v0.2 work.
+Status: done as v0.2.
 
 Scope:
 
@@ -41,11 +41,15 @@ Out of scope:
 
 Goal: prove future integrations can be added cleanly.
 
+Status: current v0.3/v0.3.1 work. v0.3.1 is validation and polish only.
+
 Scope:
 
 - Define provider interfaces and lifecycle contracts
 - Add fake providers only
 - Keep all data mocked
+- Validate the provider adapter path into the existing event bus, store, resolver, and Hub UI
+- Document the contract and current limitations
 
 Example contract:
 
@@ -63,6 +67,19 @@ Candidate fake providers:
 - DownloadProvider
 - NotificationProvider
 - AITaskProvider
+
+Event flow:
+
+```text
+Fake Provider -> provider adapter -> publishHubEvent() -> store -> resolver -> existing Hub UI
+```
+
+Out of scope for v0.3.1:
+
+- Tauri, IPC, tray, always-on-top, or desktop-shell behavior
+- Windows/system APIs
+- Real provider implementations
+- Showcase visual redesign
 
 ## Stage 3: Tauri Shell
 

@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { createHubEventBus } from "../state/hubState";
 import type { HubMode } from "../types/hub";
 import {
+  createMockNotificationEvent,
   createMockAiTaskProvider,
   createMockDownloadProvider,
   createMockMusicProvider,
@@ -49,15 +50,59 @@ test("adapter publishes download provider events through the event bus", () => {
   assert.deepEqual(modes, ["idle", "download"]);
 });
 
+test("mock providers start stopped", () => {
+  const provider = createMockMusicProvider({ now });
+
+  assert.equal(provider.getStatus(), "stopped");
+});
+
+test("start sets provider running and emits events", () => {
+  const provider = createMockMusicProvider({ now });
+  const emissions: string[][] = [];
+  const unsubscribe = provider.subscribe((events) =>
+    emissions.push(events.map((event) => event.id)),
+  );
+
+  provider.start();
+
+  assert.equal(provider.getStatus(), "running");
+  assert.deepEqual(emissions, [["mock-music-music-1780743600000"]]);
+
+  unsubscribe();
+});
+
+test("stop sets provider stopped", () => {
+  const provider = createMockMusicProvider({ now });
+
+  provider.start();
+  provider.stop();
+
+  assert.equal(provider.getStatus(), "stopped");
+});
+
+test("unsubscribe prevents provider listener calls", () => {
+  const provider = createMockMusicProvider({ now });
+  let calls = 0;
+  const unsubscribe = provider.subscribe(() => {
+    calls += 1;
+  });
+
+  unsubscribe();
+  provider.start();
+
+  assert.equal(calls, 0);
+});
+
 test("adapter preserves notification expiry behavior", () => {
   const bus = createHubEventBus();
   const provider = createMockNotificationProvider({ now });
   const connection = connectProviderToEventBus(provider, bus);
+  const notification = createMockNotificationEvent({ now });
 
   provider.start();
 
-  assert.equal(bus.getState(now).mode, "notification");
-  assert.equal(bus.getState(now + 4000).mode, "idle");
+  assert.equal(bus.getState(notification.expiresAt - 1).mode, "notification");
+  assert.equal(bus.getState(notification.expiresAt).mode, "idle");
 
   connection.disconnect();
 });
