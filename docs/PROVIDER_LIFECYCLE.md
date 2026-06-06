@@ -24,7 +24,8 @@ Lifecycle is intentionally separate from provider health and from event or task 
 `Registered` means the provider is known to a future provider registry or adapter, but it has not opened resources or started producing events.
 
 - Provider construction and registration should be cheap and side-effect free.
-- Registration should expose static metadata such as provider id, name, kind, version, priority, and mock/real source type.
+- Registration should expose static metadata such as provider id, name, kind, version, and mock/real source type.
+- Registration metadata must not include resolver priority or display priority; priority policy belongs to the Resolver.
 - Registration should not create timers, watchers, listeners, processes, IPC handles, network connections, or OS subscriptions.
 - Subscribing to provider events should be allowed while registered, but it must not implicitly start the provider.
 - A registered provider should be reusable across repeated `start()` and `stop()` cycles.
