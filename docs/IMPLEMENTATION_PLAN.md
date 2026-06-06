@@ -4,20 +4,20 @@
 
 Cober-Windows-Bar is a **Windows 11 Unified Status Hub**. It starts as a visual and interaction prototype, then gradually grows into a native-feeling desktop surface for status, developer work, and AI agent activity.
 
-The current planning scope is **v0.5.3 Documentation Alignment**. It aligns the provider event contract, runtime path, lifecycle vocabulary, registry matrix, and v0.6 slice boundary as documentation only. It does not implement provider code, tests, Tauri, Rust, IPC, real providers, Windows/system APIs, system tray behavior, always-on-top windowing, or a `/showcase` visual redesign.
+The current route is post-v0.6 provider alignment. v0.6 closed the mock Provider SDK alignment at `92f3e01 test: harden provider alignment coverage`. The next route checkpoint is v0.7 Tauri shell/runtime/IPC boundary planning and scope freeze. It does not authorize Tauri, Rust, IPC, real providers, Windows/system APIs, system tray behavior, always-on-top windowing, package/script changes, assets, or a `/showcase` visual redesign.
 
 ## 2. Stage Route
 
 - **Stage 0: UI Prototype** - done and pushed as v0.1. Delivered the Win11-style `/showcase` UI review page and six static hub states.
 - **Stage 1: Event Playground** - done as v0.2. Proved state transitions with mock Event Controls, Auto Demo playback, and Resolver Visualization.
-- **Stage 2: Architecture Planning** - current v0.4. Document runtime boundaries and future Tauri/Windows architecture needs only.
-- **Stage 3: Mock Provider SDK Planning** - v0.5. Define provider lifecycle, registry, runtime, test strategy, and implementation scope as docs only.
-- **Stage 4: Mock Provider SDK Implementation** - v0.6. Implement the first mock provider runtime slice; no Windows/system integration.
-- **Stage 5: First Real Provider** - v0.7. First real system integration after the runtime boundary is proven.
-- **Stage 6: Developer Hub** - v0.8. Add Git, Docker, WSL, Maven, Gradle, npm/pnpm, Cargo, and developer workflow surfaces.
+- **Stage 2: Architecture Planning** - closed v0.4. Documented runtime boundaries and future Tauri/Windows architecture needs only.
+- **Stage 3: Mock Provider SDK Planning and Alignment** - v0.5/v0.6. Define and align provider lifecycle, registry, runtime, test strategy, mock providers, and provider tests; no Windows/system integration.
+- **Stage 4: Tauri Shell Runtime Spike** - v0.7. Plan and freeze the shell/runtime/IPC boundary, then prove it with mock or fixture events only if separately approved.
+- **Stage 5: First Real Provider** - v0.8 or later. First real system integration after the Tauri boundary is proven.
+- **Stage 6: Developer Hub** - v0.9 or later. Add Git, Docker, WSL, Maven, Gradle, npm/pnpm, Cargo, and developer workflow surfaces.
 - **Stage 7: AI Agent Hub** - v1.0. Add Codex, Claude, GPT/OpenCode/Gemini-style agent status, queue state, progress, and multi-agent visibility.
 
-The long-term product ceiling is a Windows 11 **Unified Status Hub**, not only a Dynamic Island clone. Stages 5 and 6 are the strongest differentiation bets, but they must wait until Stage 1-4 prove the interaction model and desktop shell.
+The long-term product ceiling is a Windows 11 **Unified Status Hub**, not only a Dynamic Island clone. Real providers, developer workflows, and AI agent status are the strongest differentiation bets, but they must wait until the interaction model and desktop shell/runtime boundary are proven.
 
 ## 3. Current Technical Stack
 
@@ -121,9 +121,9 @@ Planning scope:
 
 - `docs/TAURI_STRATEGY.md` documents v0.4 as planning only.
 - The Tauri shell is described through architecture requirements: windowing, IPC, packaging, startup, always-on-top, and docking behavior.
-- The Tauri shell spike is deferred until after the v0.6 Mock Provider SDK Implementation slice.
+- The Tauri shell spike is deferred until after the v0.6 Mock Provider SDK alignment slice.
 - Real Windows providers are deferred until after the Tauri shell spike.
-- Provider sequencing remains mock-first: Mock Provider SDK planning in v0.5, Mock Provider SDK Implementation in v0.6, Tauri shell spike after v0.6, and first real provider after the shell boundary is proven.
+- Provider sequencing remains mock-first: Mock Provider SDK planning in v0.5, Mock Provider SDK alignment in v0.6, Tauri shell/runtime/IPC boundary planning and spike in v0.7, and first real provider after the shell boundary is proven.
 
 Do not implement these in v0.4:
 
@@ -143,7 +143,8 @@ Current v0.5 sequence:
 - **v0.5.2 Review & Freeze** - review the provider docs and freeze the first implementation slice.
 - **v0.5.3 Documentation Alignment** - resolve event contract, runtime path, lifecycle, registry matrix, and v0.6 scope contradictions.
 - **v0.5.4 Review & Freeze** - re-review the aligned provider docs before implementation.
-- **v0.6 Mock Provider SDK Implementation** - implement the first mock provider runtime slice only after v0.5.4 approves the freeze.
+- **v0.6 Mock Provider SDK Alignment** - closed at `92f3e01 test: harden provider alignment coverage`.
+- **v0.7 Tauri Scope Freeze** - reconcile the route and freeze the shell/runtime/IPC boundary before native implementation.
 
 The canonical runtime path is:
 
@@ -153,33 +154,53 @@ Provider -> Event Bus -> Store -> Resolver -> UI
 
 Provider registry and provider adapter layers may assist with metadata, health, lifecycle supervision, and event forwarding, but they must not bypass the Event Bus, Store, Resolver, or UI boundary.
 
-v0.6 planned implementation scope after v0.5.4 approval:
+v0.6 implemented provider alignment scope:
 
-- `src/providers/types.ts` may define the provider lifecycle and listener contract.
-- `src/providers/mockProviders.ts` may emit mock Music, Download, AI, and Notification events.
-- `src/providers/providerAdapter.ts` may forward provider events into the existing event bus.
-- `src/providers/provider.test.ts` may verify provider output resolves to the expected hub modes.
+- `src/providers/types.ts` defines the provider lifecycle and listener contract.
+- `src/providers/mockProviders.ts` emits mock Music, Download, AI, and Notification events.
+- `src/providers/providerAdapter.ts` forwards provider events into the existing event bus.
+- `src/providers/provider.test.ts` verifies provider output resolves to the expected hub modes.
+- `src/providers/providerRegistry.ts` owns the minimum in-memory provider inventory and lifecycle/health snapshots.
+- `src/providers/providerRegistry.test.ts` verifies registry behavior.
 - `docs/PROVIDER_RUNTIME.md` documents the v0.5.3 aligned runtime plan.
 - `docs/TEST_STRATEGY.md` documents the v0.5.1 test plan that v0.5.3 keeps as planning input.
 - `docs/PROVIDER_SDK.md` documents the contract, event flow, and v0.5 limitations.
 
 v0.6 does not include Tauri, IPC, Rust, Windows APIs, real providers, media sessions, notification center readers, download monitoring, tray behavior, always-on-top behavior, or packaging work. Those remain later-stage planning or implementation items after the mock provider runtime slice is proven.
 
-Do not implement these in v0.5.3:
+## 8. v0.7 Tauri Scope Freeze
+
+v0.7 should first freeze the Tauri shell/runtime/IPC boundary before any native implementation starts.
+
+Goal:
+
+- Prove the shell/runtime/IPC boundary using mock or fixture canonical HubEvents.
+- Preserve the existing event path: Provider -> Event Bus -> Store -> Resolver -> UI.
+- Keep the UI agnostic to whether events came from mock providers, IPC fixtures, or future Windows providers.
+- Define boundary diagnostics for unavailable native runtime data or malformed IPC payloads.
+
+Minimum success criteria:
+
+- The Tauri spike has a narrow goal and explicit non-goals.
+- Mock or fixture canonical HubEvents remain the only data source.
+- The spike does not bypass Event Bus, Store, Resolver, or UI boundaries.
+- Failure handling is defined as boundary diagnostics, not as real provider behavior.
+- The route remains clear: v0.7 proves shell/runtime/IPC; first real provider waits until after that proof.
+
+Non-goals:
 
 - Windows APIs, media sessions, file watchers, or system notification readers
-- Tauri, IPC, tray, or always-on-top behavior
 - Real provider implementations
 - `/showcase` visual redesigns
-- Provider runtime code, mock provider code, registry code, adapter code, or tests
+- Store, Resolver, or ProviderRegistry expansion
+- Broad Rust module design
+- Production packaging polish
 
-v0.6 implementation remains unauthorized until v0.5.4 Review & Freeze confirms that no documentation contradictions remain.
+## 9. Boundaries
 
-## 8. Boundaries
+Do not implement these in route reconciliation:
 
-Do not implement these in the current stage:
-
-- Tauri, IPC, tray, or always-on-top behavior
+- Tauri, Rust, IPC, tray, always-on-top behavior, or native shell setup
 - Windows/system APIs
 - Real MusicProvider, DownloadProvider, NotificationProvider, SystemProvider, or AITaskProvider implementations
 - Media sessions, file watchers, notification-center readers, or external service integrations
@@ -187,7 +208,7 @@ Do not implement these in the current stage:
 
 Stage 3-7 items may be described as future direction only.
 
-## 9. QA Plan
+## 10. QA Plan
 
 ### Build
 

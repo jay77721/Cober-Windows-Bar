@@ -41,7 +41,7 @@ Out of scope:
 
 Goal: plan the runtime boundary before desktop work begins.
 
-Status: current v0.4 planning work.
+Status: closed v0.4 architecture planning work.
 
 Scope:
 
@@ -61,7 +61,7 @@ Out of scope for v0.4:
 
 Goal: prove future integrations can be added cleanly without native dependencies.
 
-Target: v0.5.
+Status: v0.5 planning and v0.6 alignment/implementation are closed. v0.6 closed at `92f3e01 test: harden provider alignment coverage`.
 
 Scope:
 
@@ -91,7 +91,7 @@ Candidate fake providers:
 Event flow:
 
 ```text
-Fake Provider -> provider adapter -> publishHubEvent() -> store -> resolver -> existing Hub UI
+Mock Provider -> Event Bus -> Store -> Resolver -> existing Hub UI
 ```
 
 Out of scope for v0.5:
@@ -103,26 +103,31 @@ Out of scope for v0.5:
 
 ## Stage 4: Tauri Spike
 
-Goal: turn the web prototype into a desktop application.
+Goal: freeze and prove the shell/runtime/IPC boundary before any real provider work.
 
-Target: v0.6.
+Target: v0.7.
 
 Scope:
 
-- Tauri v2 shell
-- Transparent or acrylic-feeling window
-- Right-bottom docking above the taskbar
-- Startup behavior
-- Always-on-top behavior
-- Minimal IPC bridge using mock or fixture events
+- Tauri shell/runtime scope planning and spike gate
+- Shell needs: transparent or acrylic-feeling window, right-bottom docking, startup behavior, and always-on-top behavior
+- IPC boundary shape for canonical mock or fixture HubEvents
+- Proof that mocked events can still flow through Event Bus -> Store -> Resolver -> Hub UI
+- Failure and diagnostic expectations when the native boundary is unavailable or malformed
 
-Real providers remain out of scope unless a later spike explicitly changes that boundary.
+Non-goals:
+
+- Real providers or Windows APIs
+- Broad Rust module design
+- Production packaging polish
+- UI redesign
+- Store, Resolver, or ProviderRegistry expansion
 
 ## Stage 5: First Real Provider
 
 Goal: connect real system data for the first time.
 
-Target: v0.7.
+Target: v0.8 or later, after the Tauri shell/runtime boundary is proven.
 
 Priority:
 
@@ -141,7 +146,7 @@ Candidate sources:
 
 Goal: become a daily developer status center.
 
-Target: v0.8.
+Target: v0.9 or later.
 
 Candidate surfaces:
 
