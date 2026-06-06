@@ -25,8 +25,6 @@ export const createMockMusicEvent = (options: MockProviderOptions = {}): HubEven
     id: createEventId("mock-music", "music", createdAt),
     type: "music",
     source: "music",
-    title: "Midnight City",
-    subtitle: "M83 - Hurry Up, We're Dreaming",
     createdAt,
     progress: 68,
     payload: {
@@ -45,8 +43,6 @@ export const createMockDownloadEvent = (options: MockProviderOptions = {}): HubE
     id: createEventId("mock-download", "download", createdAt),
     type: "download",
     source: "download",
-    title: "Windows SDK Preview.zip",
-    subtitle: "Downloading - 42.8 MB of 96 MB",
     createdAt,
     progress: 45,
     payload: {
@@ -67,8 +63,6 @@ export const createMockAiTaskEvent = (options: MockProviderOptions = {}): HubEve
     id: createEventId("mock-ai", "ai", createdAt),
     type: "ai",
     source: "ai",
-    title: "Codex is updating the provider SDK",
-    subtitle: "Generating mock provider contract tests",
     createdAt,
     progress: 72,
     payload: {
@@ -89,8 +83,6 @@ export const createMockNotificationEvent = (options: MockProviderOptions = {}): 
     id: createEventId("mock-notification", "notification", createdAt),
     type: "notification",
     source: "notification",
-    title: "Build complete",
-    subtitle: "npm run qa passed",
     createdAt,
     expiresAt: createdAt + 3000,
     payload: {

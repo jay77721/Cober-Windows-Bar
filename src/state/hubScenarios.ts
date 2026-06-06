@@ -34,8 +34,6 @@ export function createMusicDemoEvent(now = Date.now()): HubEvent {
     ...eventDefaults(now),
     id: "demo-music",
     type: "music",
-    title: "Neon Focus",
-    subtitle: "Acrylic Night Drive",
     progress: 42,
     payload: {
       title: "Neon Focus",
@@ -51,9 +49,15 @@ export function createAiDemoEvent(now = Date.now()): HubEvent {
     ...eventDefaults(now),
     id: "demo-ai",
     type: "ai",
-    title: "GPT workspace",
-    subtitle: "Generating showcase motion states",
     progress: 68,
+    payload: {
+      id: "demo-ai-task",
+      type: "ai",
+      title: "GPT workspace",
+      subtitle: "Generating showcase motion states",
+      progress: 68,
+      accent: "blue",
+    },
   };
 }
 
@@ -62,9 +66,15 @@ export function createDownloadDemoEvent(now = Date.now()): HubEvent {
     ...eventDefaults(now),
     id: "demo-download",
     type: "download",
-    title: "Cober-Windows-Bar.zip",
-    subtitle: "Downloading release preview",
     progress: 36,
+    payload: {
+      id: "demo-download-task",
+      type: "download",
+      title: "Cober-Windows-Bar.zip",
+      subtitle: "Downloading release preview",
+      progress: 36,
+      accent: "green",
+    },
   };
 }
 
@@ -73,8 +83,6 @@ export function createNotificationDemoEvent(now = Date.now()): HubEvent {
     ...eventDefaults(now),
     id: "demo-notification",
     type: "notification",
-    title: "Teams",
-    subtitle: "Design review is ready",
     expiresAt: now + NOTIFICATION_TTL_MS,
     payload: {
       app: "Microsoft Teams",

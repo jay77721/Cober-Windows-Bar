@@ -318,8 +318,32 @@ function FlowArrow() {
   return <div className="hidden px-1 text-center text-slate-400 sm:block">-&gt;</div>;
 }
 
+function getEventDisplayText(event: HubEvent) {
+  const payload = event.payload;
+
+  if (payload && "title" in payload) {
+    return {
+      title: payload.title,
+      subtitle: payload.subtitle,
+    };
+  }
+
+  if (payload && "sender" in payload) {
+    return {
+      title: payload.sender,
+      subtitle: payload.message,
+    };
+  }
+
+  return {
+    title: event.type,
+    subtitle: event.source,
+  };
+}
+
 function EventRow({ event }: { event: HubEvent }) {
   const progress = typeof event.progress === "number" ? Math.max(0, Math.min(event.progress, 100)) : undefined;
+  const display = getEventDisplayText(event);
 
   return (
     <div className="rounded-[12px] border border-white/10 bg-white/[0.055] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
@@ -331,8 +355,8 @@ function EventRow({ event }: { event: HubEvent }) {
             </span>
             <span className="text-[11px] text-slate-500">{event.source}</span>
           </div>
-          <div className="mt-1 truncate text-sm font-semibold text-white">{event.title}</div>
-          <div className="truncate text-xs leading-5 text-slate-400">{event.subtitle}</div>
+          <div className="mt-1 truncate text-sm font-semibold text-white">{display.title}</div>
+          <div className="truncate text-xs leading-5 text-slate-400">{display.subtitle}</div>
         </div>
         {typeof progress === "number" && (
           <span className="shrink-0 rounded-full bg-white/[0.075] px-2 py-0.5 text-[11px] font-semibold text-slate-200">

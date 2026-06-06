@@ -44,11 +44,13 @@ export function resolveHubMode(events: HubEvent[], now = Date.now()): HubMode {
 }
 
 export function eventToTask(event: HubEvent): HubTask {
+  const payload = event.payload && "title" in event.payload ? event.payload : undefined;
+
   return {
     id: event.id,
     type: event.type,
-    title: event.title,
-    subtitle: event.subtitle,
+    title: payload?.title ?? event.type,
+    subtitle: payload?.subtitle ?? "",
     progress: event.progress,
     accent: taskAccentMap[event.type],
   };

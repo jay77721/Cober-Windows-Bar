@@ -15,10 +15,16 @@ function event(overrides: Partial<HubEvent> = {}): HubEvent {
     id: "event-1",
     type: "ai",
     source: "mock",
-    title: "GPT-5.5",
-    subtitle: "正在生成代码...",
     createdAt: now,
     progress: 68,
+    payload: {
+      id: "event-1-task",
+      type: "ai",
+      title: "GPT-5.5",
+      subtitle: "正在生成代码...",
+      progress: 68,
+      accent: "blue",
+    },
     ...overrides,
   };
 }
@@ -90,6 +96,13 @@ test("event bus publishes latest state and replaces events by id", () => {
   assert.equal(bus.getState(now + 1000).tasks[0]?.progress, 80);
 
   unsubscribe();
+});
+
+test("store derives task display fields from event payload", () => {
+  const state = createHubStoreState([event()], now);
+
+  assert.equal(state.tasks[0]?.title, "GPT-5.5");
+  assert.equal(state.tasks[0]?.subtitle, "正在生成代码...");
 });
 
 test("event demo scenarios resolve to their expected hub modes", () => {

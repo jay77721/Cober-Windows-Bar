@@ -50,6 +50,25 @@ test("adapter publishes download provider events through the event bus", () => {
   assert.deepEqual(modes, ["idle", "download"]);
 });
 
+test("mock provider events use canonical top-level fields", () => {
+  const bus = createHubEventBus();
+  const provider = createMockMusicProvider({ now });
+  const connection = connectProviderToEventBus(provider, bus);
+
+  provider.start();
+  const [event] = bus.getState(now).events;
+
+  assert.equal(event?.id, "mock-music-music-1780743600000");
+  assert.equal(event?.type, "music");
+  assert.equal(event?.source, "music");
+  assert.equal(event?.createdAt, now);
+  assert.equal("title" in (event ?? {}), false);
+  assert.equal("subtitle" in (event ?? {}), false);
+  assert.equal(bus.getState(now).tasks[0]?.title, "Midnight City");
+
+  connection.disconnect();
+});
+
 test("mock providers start stopped", () => {
   const provider = createMockMusicProvider({ now });
 

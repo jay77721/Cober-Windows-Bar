@@ -25,12 +25,11 @@ export type HubEvent = {
   id: string;
   type: HubEventType;
   source: HubEventSource;
-  title: string;
-  subtitle: string;
   createdAt: number;
   expiresAt?: number;
   progress?: number;
   payload?: MusicState | NotificationState | HubTask;
+  metadata?: Record<string, unknown>;
 };
 
 export type HubStoreState = {
