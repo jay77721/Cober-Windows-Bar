@@ -69,13 +69,16 @@ test("mock provider events use canonical top-level fields", () => {
   connection.disconnect();
 });
 
-test("mock providers start stopped", () => {
+test("mock providers start with stopped lifecycle and healthy health", () => {
   const provider = createMockMusicProvider({ now });
 
-  assert.equal(provider.getStatus(), "stopped");
+  assert.deepEqual(provider.status(), {
+    lifecycle: "Stopped",
+    health: "Healthy",
+  });
 });
 
-test("start sets provider running and emits events", () => {
+test("start sets provider publishing and emits events", () => {
   const provider = createMockMusicProvider({ now });
   const emissions: string[][] = [];
   const unsubscribe = provider.subscribe((events) =>
@@ -84,19 +87,44 @@ test("start sets provider running and emits events", () => {
 
   provider.start();
 
-  assert.equal(provider.getStatus(), "running");
+  assert.deepEqual(provider.status(), {
+    lifecycle: "Publishing",
+    health: "Healthy",
+  });
   assert.deepEqual(emissions, [["mock-music-music-1780743600000"]]);
 
   unsubscribe();
 });
 
-test("stop sets provider stopped", () => {
+test("duplicate start does not duplicate unintended emissions", () => {
+  const provider = createMockMusicProvider({ now });
+  const emissions: string[][] = [];
+  const unsubscribe = provider.subscribe((events) =>
+    emissions.push(events.map((event) => event.id)),
+  );
+
+  provider.start();
+  provider.start();
+
+  assert.deepEqual(provider.status(), {
+    lifecycle: "Publishing",
+    health: "Healthy",
+  });
+  assert.deepEqual(emissions, [["mock-music-music-1780743600000"]]);
+
+  unsubscribe();
+});
+
+test("stop sets provider stopped lifecycle and keeps health healthy", () => {
   const provider = createMockMusicProvider({ now });
 
   provider.start();
   provider.stop();
 
-  assert.equal(provider.getStatus(), "stopped");
+  assert.deepEqual(provider.status(), {
+    lifecycle: "Stopped",
+    health: "Healthy",
+  });
 });
 
 test("unsubscribe prevents provider listener calls", () => {

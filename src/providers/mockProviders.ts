@@ -1,5 +1,10 @@
 import type { HubEvent } from "../types/hub";
-import type { HubProvider, HubProviderListener, MockProviderOptions } from "./types";
+import type {
+  HubProvider,
+  HubProviderLifecycle,
+  HubProviderListener,
+  MockProviderOptions,
+} from "./types";
 
 type MockProviderConfig = {
   id: string;
@@ -94,11 +99,11 @@ export const createMockNotificationEvent = (options: MockProviderOptions = {}): 
 };
 
 const createMockProvider = ({ id, label, events }: MockProviderConfig): HubProvider => {
-  let running = false;
+  let lifecycle: HubProviderLifecycle = "Stopped";
   const listeners = new Set<HubProviderListener>();
 
   const emit = () => {
-    if (!running) {
+    if (lifecycle !== "Publishing") {
       return;
     }
 
@@ -110,11 +115,15 @@ const createMockProvider = ({ id, label, events }: MockProviderConfig): HubProvi
     id,
     label,
     start() {
-      running = true;
+      if (lifecycle === "Publishing") {
+        return;
+      }
+
+      lifecycle = "Publishing";
       emit();
     },
     stop() {
-      running = false;
+      lifecycle = "Stopped";
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -123,8 +132,11 @@ const createMockProvider = ({ id, label, events }: MockProviderConfig): HubProvi
         listeners.delete(listener);
       };
     },
-    getStatus() {
-      return running ? "running" : "stopped";
+    status() {
+      return {
+        lifecycle,
+        health: "Healthy",
+      };
     },
   };
 };

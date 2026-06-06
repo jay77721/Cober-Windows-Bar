@@ -1,6 +1,19 @@
 import type { HubEvent } from "../types/hub";
 
-export type HubProviderStatus = "stopped" | "running" | "error";
+export type HubProviderLifecycle =
+  | "Registered"
+  | "Started"
+  | "Publishing"
+  | "Paused"
+  | "Stopped"
+  | "Failed";
+
+export type HubProviderHealth = "Healthy" | "Degraded" | "Unhealthy";
+
+export type HubProviderStatus = {
+  lifecycle: HubProviderLifecycle;
+  health: HubProviderHealth;
+};
 
 export type HubProviderListener = (events: HubEvent[]) => void;
 
@@ -14,5 +27,5 @@ export type HubProvider = {
   start(): void;
   stop(): void;
   subscribe(listener: HubProviderListener): () => void;
-  getStatus(): HubProviderStatus;
+  status(): HubProviderStatus;
 };
