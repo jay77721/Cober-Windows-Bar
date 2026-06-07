@@ -39,14 +39,20 @@ async function ensureServer() {
     return false;
   }
 
-  server = spawn(
-    process.platform === "win32" ? "npm.cmd" : "npm",
-    ["run", "dev", "--", "--host", "127.0.0.1"],
-    {
-      env: { ...process.env, BROWSER: "none" },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
+  const command = process.env.npm_execpath ? process.execPath : process.platform === "win32" ? "npm.cmd" : "npm";
+  const args = [
+    ...(process.env.npm_execpath ? [process.env.npm_execpath] : []),
+    "run",
+    "dev",
+    "--",
+    "--host",
+    "127.0.0.1",
+  ];
+
+  server = spawn(command, args, {
+    env: { ...process.env, BROWSER: "none" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
   server.stdout.on("data", (data) => process.stdout.write(data));
   server.stderr.on("data", (data) => process.stderr.write(data));
@@ -96,7 +102,7 @@ async function run() {
     await expectText(panel, "Mock Music Provider");
 
     await clickButton(panel, "AI");
-    await expectText(panel, "Mock AI Task Provider");
+    await expectText(panel, "Mock AI Provider");
 
     await clickButton(panel, "Download");
     await expectText(panel, "Mock Download Provider");
