@@ -5,26 +5,26 @@ import { ProgressBar } from "../ui/ProgressBar";
 export function TaskbarFusionDemo() {
   return (
     <section className="space-y-4 font-['Segoe_UI','Microsoft_YaHei',system-ui,sans-serif]">
-      <h2 className="text-xl font-semibold text-white">任务栏融合模式示例</h2>
+      <h2 className="text-xl font-semibold text-white">Taskbar-style composition mock</h2>
       <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(244,249,255,0.14),rgba(221,236,255,0.07))] px-3 py-3 shadow-[0_20px_58px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-2xl">
         <div className="flex min-h-[58px] items-center justify-between gap-3 rounded-[18px] border border-white/10 bg-[rgba(20,31,47,0.62)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.11)]">
           <div className="hidden min-w-[124px] items-center gap-2 text-xs text-slate-300 min-[1366px]:flex">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.06]">☁</span>
-            <span className="leading-4">24°C<br />晴朗</span>
+            <span className="leading-4">24 C<br />Clear mock</span>
           </div>
 
           <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
-            <TaskbarButton active label="开始">
+            <TaskbarButton active label="Start area mock">
               <span className="text-lg leading-none text-[#60cdff]">⊞</span>
             </TaskbarButton>
             <div className="hidden h-9 w-[160px] items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 text-sm text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] md:flex min-[1500px]:w-[216px]">
               <Search size={16} />
-              <span className="truncate">搜索应用、设置和文件</span>
+              <span className="truncate">Search mock apps and settings</span>
             </div>
-            <TaskbarButton label="文件资源管理器">
+            <TaskbarButton label="File shortcut mock">
               <Folder className="text-yellow-300" size={20} />
             </TaskbarButton>
-            <TaskbarButton label="浏览器">
+            <TaskbarButton label="Browser shortcut mock">
               <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-[#40c4ff] via-[#4cc38a] to-[#ffd166] text-[11px] font-semibold text-white">
                 e
               </span>
