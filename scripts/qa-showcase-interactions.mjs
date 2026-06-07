@@ -61,6 +61,37 @@ async function ensureServer() {
   return true;
 }
 
+async function stopServer() {
+  if (!server) {
+    return;
+  }
+
+  const child = server;
+  server = undefined;
+
+  child.stdout?.removeAllListeners();
+  child.stderr?.removeAllListeners();
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+
+  if (!child.pid || child.exitCode !== null) {
+    return;
+  }
+
+  if (process.platform === "win32") {
+    await new Promise((resolve) => {
+      const taskkill = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
+      taskkill.on("close", resolve);
+      taskkill.on("error", resolve);
+    });
+    return;
+  }
+
+  child.kill();
+}
+
 async function clickButton(locator, name) {
   await locator.getByRole("button", { name, exact: true }).click();
 }
@@ -199,7 +230,7 @@ async function run() {
     throw error;
   } finally {
     await browser.close();
-    server?.kill();
+    await stopServer();
   }
 }
 
