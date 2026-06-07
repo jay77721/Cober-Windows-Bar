@@ -13,7 +13,7 @@ import {
   createMockNotificationProvider,
 } from "./mockProviders";
 import { connectProviderToEventBus } from "./providerAdapter";
-import type { HubProvider } from "./types";
+import type { HubProvider, HubProviderCapability } from "./types";
 
 const now = Date.UTC(2026, 5, 6, 11, 0, 0);
 
@@ -53,6 +53,13 @@ function assertNoPriorityOrModeHints(value: unknown) {
     assert.equal(forbidden.has(key), false, `${key} must not be provider metadata`);
   }
 }
+
+const musicCapabilityPreflightDescriptor: HubProviderCapability = {
+  id: "music",
+  kind: "music",
+  origin: "native",
+  support: "preflight",
+};
 
 function collectModes(provider: HubProvider): HubMode[] {
   const bus = createHubEventBus();
@@ -216,6 +223,24 @@ test("mock providers expose stable metadata and matching capabilities", () => {
     assertNoPriorityOrModeHints(provider.metadata);
     assertNoPriorityOrModeHints(provider.capabilities);
   }
+});
+
+test("music capability preflight descriptor stays facts-only", () => {
+  assert.deepEqual(musicCapabilityPreflightDescriptor, {
+    id: "music",
+    kind: "music",
+    origin: "native",
+    support: "preflight",
+  });
+  assertNoPriorityOrModeHints(musicCapabilityPreflightDescriptor);
+  assert.equal("provider" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("start" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("subscribe" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("emit" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("available" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("ready" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("connected" in musicCapabilityPreflightDescriptor, false);
+  assert.equal("implemented" in musicCapabilityPreflightDescriptor, false);
 });
 
 test("canonical AI provider alias preserves existing AI task provider compatibility", () => {

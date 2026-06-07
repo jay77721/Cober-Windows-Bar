@@ -6,12 +6,24 @@ import {
   createMockNotificationProvider,
 } from "./mockProviders";
 import { createProviderRegistry } from "./providerRegistry";
-import type { HubProvider, HubProviderLifecycle, HubProviderStatus } from "./types";
+import type {
+  HubProvider,
+  HubProviderCapability,
+  HubProviderLifecycle,
+  HubProviderStatus,
+} from "./types";
 
 function test(name: string, run: () => void) {
   run();
   console.log(`ok ${name}`);
 }
+
+const musicCapabilityPreflightDescriptor: HubProviderCapability = {
+  id: "music",
+  kind: "music",
+  origin: "native",
+  support: "preflight",
+};
 
 function providerWithSpies(
   id = "spy-provider",
@@ -245,10 +257,7 @@ test("registry snapshots preserve native preflight capability facts without prov
   };
   nativePreflight.provider.capabilities = [
     {
-      id: "music",
-      kind: "music",
-      origin: "native",
-      support: "preflight",
+      ...musicCapabilityPreflightDescriptor,
     },
   ];
 
@@ -259,10 +268,7 @@ test("registry snapshots preserve native preflight capability facts without prov
 
   assert.deepEqual(fromGet?.capabilities, [
     {
-      id: "music",
-      kind: "music",
-      origin: "native",
-      support: "preflight",
+      ...musicCapabilityPreflightDescriptor,
     },
   ]);
   assert.deepEqual(fromList?.capabilities, fromGet?.capabilities);
@@ -277,10 +283,7 @@ test("registry snapshots preserve native preflight capability facts without prov
 
   assert.deepEqual(registry.get(nativePreflight.provider.id)?.capabilities, [
     {
-      id: "music",
-      kind: "music",
-      origin: "native",
-      support: "preflight",
+      ...musicCapabilityPreflightDescriptor,
     },
   ]);
   assert.equal(nativePreflight.startCalls, 0);
