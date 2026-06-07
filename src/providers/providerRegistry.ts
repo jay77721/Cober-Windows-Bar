@@ -27,6 +27,14 @@ export type ProviderRegistryRegisterResult =
       id: string;
     };
 
+export type ProviderRegistryCapabilitySupportRecord = {
+  providerId: string;
+  providerName: string;
+  providerKind: HubProviderKind;
+  registrationOrder: number;
+  capability: HubProviderCapability;
+};
+
 type ProviderRegistryEntry = {
   provider: HubProvider;
   registrationOrder: number;
@@ -44,6 +52,20 @@ function snapshotProvider(entry: ProviderRegistryEntry): ProviderRegistryRecord 
     status: { ...provider.status() },
     registrationOrder,
   };
+}
+
+function snapshotCapabilitySupport(
+  entry: ProviderRegistryEntry,
+): ProviderRegistryCapabilitySupportRecord[] {
+  const { provider, registrationOrder } = entry;
+
+  return provider.capabilities.map((capability) => ({
+    providerId: provider.id,
+    providerName: provider.metadata.name,
+    providerKind: provider.metadata.kind,
+    registrationOrder,
+    capability: { ...capability },
+  }));
 }
 
 export function createProviderRegistry() {
@@ -88,6 +110,12 @@ export function createProviderRegistry() {
       return [...entries.values()]
         .sort((left, right) => left.registrationOrder - right.registrationOrder)
         .map(snapshotProvider);
+    },
+
+    listCapabilitySupport() {
+      return [...entries.values()]
+        .sort((left, right) => left.registrationOrder - right.registrationOrder)
+        .flatMap(snapshotCapabilitySupport);
     },
 
     unregister(providerId: string) {

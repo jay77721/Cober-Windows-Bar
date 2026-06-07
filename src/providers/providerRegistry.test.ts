@@ -135,6 +135,86 @@ test("registry preserves deterministic registration order", () => {
   );
 });
 
+test("registry lists provider capability support as copied read model facts", () => {
+  const registry = createProviderRegistry();
+  const music = createMockMusicProvider();
+  const ai = createMockAIProvider();
+
+  registry.register(music);
+  registry.register(ai);
+
+  const capabilitySupport = registry.listCapabilitySupport();
+
+  assert.deepEqual(capabilitySupport, [
+    {
+      providerId: "mock-music-provider",
+      providerName: "Mock Music Provider",
+      providerKind: "music",
+      registrationOrder: 0,
+      capability: {
+        id: "music",
+        kind: "music",
+        origin: "mock",
+        support: "available",
+      },
+    },
+    {
+      providerId: "mock-ai-task-provider",
+      providerName: "Mock AI Provider",
+      providerKind: "ai",
+      registrationOrder: 1,
+      capability: {
+        id: "ai",
+        kind: "ai",
+        origin: "mock",
+        support: "available",
+      },
+    },
+  ]);
+
+  capabilitySupport[0]!.capability.support = "unsupported";
+
+  assert.deepEqual(registry.listCapabilitySupport()[0]?.capability, {
+    id: "music",
+    kind: "music",
+    origin: "mock",
+    support: "available",
+  });
+});
+
+test("registry capability support preserves native preflight facts without provider behavior", () => {
+  const registry = createProviderRegistry();
+  const nativePreflight = providerWithSpies("native-music-preflight");
+
+  nativePreflight.provider.metadata = {
+    ...nativePreflight.provider.metadata,
+    name: "Native Music Capability Preflight",
+    mock: false,
+  };
+  nativePreflight.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+  ];
+
+  registry.register(nativePreflight.provider);
+
+  assert.deepEqual(registry.listCapabilitySupport(), [
+    {
+      providerId: "native-music-preflight",
+      providerName: "Native Music Capability Preflight",
+      providerKind: "music",
+      registrationOrder: 0,
+      capability: {
+        ...musicCapabilityPreflightDescriptor,
+      },
+    },
+  ]);
+  assert.equal(nativePreflight.startCalls, 0);
+  assert.equal(nativePreflight.stopCalls, 0);
+  assert.equal(nativePreflight.subscribeCalls, 0);
+});
+
 test("registry list returns a copy instead of mutable internal array", () => {
   const registry = createProviderRegistry();
   registry.register(createMockMusicProvider());
