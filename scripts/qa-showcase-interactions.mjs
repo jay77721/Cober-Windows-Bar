@@ -75,6 +75,42 @@ async function run() {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 
+  await page.addInitScript(() => {
+    window.__qaTauriInvokeDelayMs = 0;
+    window.__TAURI__ = {
+      core: {
+        invoke: async (command) => {
+          if (command !== "get_hub_event_fixtures") {
+            throw new Error(`Unexpected Tauri command: ${command}`);
+          }
+
+          if (window.__qaTauriInvokeDelayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, window.__qaTauriInvokeDelayMs));
+          }
+
+          return [
+            {
+              id: "qa-tauri-fixture-ai",
+              type: "ai",
+              source: "mock",
+              createdAt: 1780743600000,
+              progress: 64,
+              payload: {
+                id: "qa-tauri-fixture-ai-task",
+                type: "ai",
+                title: "QA Tauri Fixture",
+                subtitle: "Injected runtime fixture",
+                progress: 64,
+                accent: "blue",
+              },
+              metadata: { runtime: "tauri", fixture: true },
+            },
+          ];
+        },
+      },
+    };
+  });
+
   page.on("console", (message) => {
     if (message.type() === "error") {
       consoleErrors.push(message.text());
@@ -122,6 +158,31 @@ async function run() {
     await expectText(panel, "Provider stopped");
     await expectText(page, "Current mode: Idle");
     await expectText(page, "Idle event stream");
+
+    await clickButton(panel, "Tauri Fixture");
+    await expectText(panel, "Tauri fixture published");
+    await expectText(page, "QA Tauri Fixture");
+    await expectText(page, "Injected runtime fixture");
+    await expectText(page, "Current mode: AI Progress");
+
+    await page.evaluate(() => {
+      window.__qaTauriInvokeDelayMs = 350;
+    });
+    await clickButton(panel, "Tauri Fixture");
+    await clickButton(panel, "Clear to idle");
+    await page.waitForTimeout(500);
+    await expectText(page, "Current mode: Idle");
+    await expectText(page, "Idle event stream");
+
+    const staleFixtureCount = await page.getByText("QA Tauri Fixture", { exact: true }).count();
+    if (staleFixtureCount > 0) {
+      throw new Error("Stale Tauri fixture request published after Clear to idle");
+    }
+
+    const stalePublishedLabelCount = await page.getByText("Tauri fixture published", { exact: true }).count();
+    if (stalePublishedLabelCount > 0) {
+      throw new Error("Stale Tauri fixture request updated the playground label after Clear to idle");
+    }
 
     if (consoleErrors.length > 0 || pageErrors.length > 0) {
       throw new Error(

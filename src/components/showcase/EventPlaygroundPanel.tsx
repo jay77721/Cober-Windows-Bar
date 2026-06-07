@@ -30,6 +30,8 @@ type EventPlaygroundPanelProps = {
   onProviderNotification: () => void;
   onProviderStop: () => void;
   onProviderClear: () => void;
+  tauriFixtureLabel?: string;
+  onTauriFixture: () => void;
 };
 
 type EventAction = {
@@ -86,6 +88,8 @@ export function EventPlaygroundPanel({
   onProviderNotification,
   onProviderStop,
   onProviderClear,
+  tauriFixtureLabel,
+  onTauriFixture,
 }: EventPlaygroundPanelProps) {
   const actions: EventAction[] = [
     {
@@ -179,6 +183,7 @@ export function EventPlaygroundPanel({
             <ProviderButton label="AI" icon={Bot} onClick={onProviderAi} tone="sky" />
             <ProviderButton label="Download" icon={Download} onClick={onProviderDownload} tone="emerald" />
             <ProviderButton label="Notify" icon={Bell} onClick={onProviderNotification} tone="amber" />
+            <ProviderButton label="Tauri Fixture" icon={Sparkles} onClick={onTauriFixture} tone="violet" />
             <ProviderButton label="Stop provider" icon={CircleStop} onClick={onProviderStop} tone="slate" />
             <ProviderButton label="Clear to idle" icon={Trash2} onClick={onProviderClear} tone="slate" />
             <span
@@ -190,6 +195,11 @@ export function EventPlaygroundPanel({
             >
               {activeProviderLabel ? "Provider running" : "Provider stopped"}
             </span>
+            {tauriFixtureLabel && (
+              <span className="rounded-full border border-violet-200/20 bg-violet-300/10 px-2.5 py-1 text-xs font-semibold text-violet-100">
+                {tauriFixtureLabel}
+              </span>
+            )}
           </div>
         </div>
 

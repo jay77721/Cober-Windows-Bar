@@ -20,6 +20,7 @@ import {
 } from "../providers/mockProviders";
 import { connectProviderToEventBus, type ProviderConnection } from "../providers/providerAdapter";
 import type { HubProvider } from "../providers/types";
+import { loadTauriFixtureHubEvents } from "../runtime/tauriRuntime";
 import type { HubMode, HubStoreState } from "../types/hub";
 
 type ProviderDemoId = "music" | "ai" | "download" | "notification";
@@ -34,8 +35,10 @@ export function ShowcasePage() {
   const [storeState, setStoreState] = useState<HubStoreState>(() => eventBus.getState());
   const [isAutoRunning, setIsAutoRunning] = useState(false);
   const [activeProviderLabel, setActiveProviderLabel] = useState<string>();
+  const [tauriFixtureLabel, setTauriFixtureLabel] = useState<string>();
   const demoTimers = useRef<number[]>([]);
   const activeProviderDemo = useRef<ActiveProviderDemo | undefined>(undefined);
+  const tauriFixtureRequestId = useRef(0);
   const activeMode = storeState.mode;
 
   const clearDemoTimers = useCallback(() => {
@@ -44,10 +47,12 @@ export function ShowcasePage() {
   }, []);
 
   const stopProviderDemo = useCallback(() => {
+    tauriFixtureRequestId.current += 1;
     activeProviderDemo.current?.connection.disconnect();
     activeProviderDemo.current?.provider.stop();
     activeProviderDemo.current = undefined;
     setActiveProviderLabel(undefined);
+    setTauriFixtureLabel(undefined);
   }, []);
 
   const stopAutoDemo = useCallback(() => {
@@ -134,6 +139,25 @@ export function ShowcasePage() {
     playHubDemoScenario(eventBus, createHubDemoScenario("idle", Date.now()), Date.now());
   }, [eventBus, stopProviderDemo]);
 
+  const triggerTauriFixtureDemo = useCallback(async () => {
+    stopAutoDemo();
+    stopProviderDemo();
+    const requestId = ++tauriFixtureRequestId.current;
+    setTauriFixtureLabel("Loading fixture");
+
+    const result = await loadTauriFixtureHubEvents();
+
+    if (requestId !== tauriFixtureRequestId.current) {
+      return;
+    }
+
+    if (result.ok) {
+      result.events.forEach((event) => eventBus.publishHubEvent(event));
+    }
+
+    setTauriFixtureLabel(result.ok ? "Tauri fixture published" : `Tauri ${result.diagnostic.code}`);
+  }, [eventBus, stopAutoDemo, stopProviderDemo]);
+
   useEffect(() => {
     return eventBus.subscribe(setStoreState);
   }, [eventBus]);
@@ -214,6 +238,8 @@ export function ShowcasePage() {
                 onProviderNotification={() => triggerProviderDemo("notification")}
                 onProviderStop={stopProviderDemo}
                 onProviderClear={clearProviderDemo}
+                tauriFixtureLabel={tauriFixtureLabel}
+                onTauriFixture={triggerTauriFixtureDemo}
               />
 
               <StatusFlow activeMode={activeMode} />
