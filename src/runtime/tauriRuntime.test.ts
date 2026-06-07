@@ -2,14 +2,39 @@ import { strict as assert } from "node:assert";
 import {
   getTauriInvoke,
   loadTauriFixtureHubEvents,
+  publishTauriFixtureEvents,
   TAURI_FIXTURE_COMMAND,
   type TauriInvoke,
 } from "./tauriRuntime";
+import type { HubEvent } from "../types/hub";
 
 const tests: Array<{ name: string; run: () => void | Promise<void> }> = [];
 
 function test(name: string, run: () => void | Promise<void>) {
   tests.push({ name, run });
+}
+
+function fixtureEvent(overrides: Partial<HubEvent> = {}): HubEvent {
+  return {
+    id: "tauri-fixture-ai",
+    type: "ai",
+    source: "mock",
+    createdAt: 1780743600000,
+    progress: 64,
+    payload: {
+      id: "tauri-fixture-ai-task",
+      type: "ai",
+      title: "Tauri IPC fixture",
+      subtitle: "Boundary smoke event from native fixture command",
+      progress: 64,
+      accent: "blue",
+    },
+    metadata: {
+      runtime: "tauri",
+      fixture: true,
+    },
+    ...overrides,
+  };
 }
 
 test("detects unavailable Tauri invoke", async () => {
@@ -58,27 +83,7 @@ test("loads canonical fixture events through the configured command", async () =
   const result = await loadTauriFixtureHubEvents({
     invoke: async (command) => {
       calls.push(command);
-      return [
-        {
-          id: "tauri-fixture-ai",
-          type: "ai",
-          source: "mock",
-          createdAt: 1780743600000,
-          progress: 64,
-          payload: {
-            id: "tauri-fixture-ai-task",
-            type: "ai",
-            title: "Tauri IPC fixture",
-            subtitle: "Boundary smoke event from native fixture command",
-            progress: 64,
-            accent: "blue",
-          },
-          metadata: {
-            runtime: "tauri",
-            fixture: true,
-          },
-        },
-      ];
+      return [fixtureEvent()];
     },
   });
 
@@ -90,6 +95,78 @@ test("loads canonical fixture events through the configured command", async () =
     assert.equal(result.events[0]?.source, "mock");
     assert.equal(result.events[0]?.metadata?.runtime, "tauri");
   }
+});
+
+test("publishes canonical fixture events through the event bus boundary", async () => {
+  const publishedEvents: HubEvent[] = [];
+  const result = await publishTauriFixtureEvents(
+    {
+      publishHubEvent(event) {
+        publishedEvents.push(event);
+      },
+    },
+    {
+      invoke: async () => [fixtureEvent()],
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(publishedEvents.length, 1);
+  assert.equal(publishedEvents[0]?.id, "tauri-fixture-ai");
+  assert.equal(publishedEvents[0]?.type, "ai");
+  assert.equal(publishedEvents[0]?.source, "mock");
+  assert.equal(publishedEvents[0]?.metadata?.runtime, "tauri");
+});
+
+test("does not publish when Tauri invoke is unavailable", async () => {
+  const publishedEvents: HubEvent[] = [];
+  const result = await publishTauriFixtureEvents({
+    publishHubEvent(event) {
+      publishedEvents.push(event);
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "unavailable");
+  assert.equal(publishedEvents.length, 0);
+});
+
+test("does not publish malformed fixture payloads", async () => {
+  const publishedEvents: HubEvent[] = [];
+  const result = await publishTauriFixtureEvents(
+    {
+      publishHubEvent(event) {
+        publishedEvents.push(event);
+      },
+    },
+    {
+      invoke: async () => [fixtureEvent({ type: "unknown" as HubEvent["type"] })],
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "malformed");
+  assert.equal(publishedEvents.length, 0);
+});
+
+test("does not publish when fixture command fails", async () => {
+  const publishedEvents: HubEvent[] = [];
+  const result = await publishTauriFixtureEvents(
+    {
+      publishHubEvent(event) {
+        publishedEvents.push(event);
+      },
+    },
+    {
+      invoke: async () => {
+        throw new Error("native boundary failed");
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "invoke-failed");
+  assert.equal(publishedEvents.length, 0);
 });
 
 for (const { name, run } of tests) {

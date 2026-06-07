@@ -22,6 +22,10 @@ export type TauriRuntimeResult =
       diagnostic: TauriRuntimeDiagnostic;
     };
 
+export type HubEventPublisher = {
+  publishHubEvent(event: HubEvent): void;
+};
+
 type TauriGlobal = {
   __TAURI__?: {
     core?: {
@@ -91,6 +95,23 @@ export async function loadTauriFixtureHubEvents({
       },
     };
   }
+}
+
+export async function publishTauriFixtureEvents(
+  eventBus: HubEventPublisher,
+  options: {
+    invoke?: TauriInvoke;
+  } = {},
+): Promise<TauriRuntimeResult> {
+  const result = await loadTauriFixtureHubEvents(options);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  result.events.forEach((event) => eventBus.publishHubEvent(event));
+
+  return result;
 }
 
 function parseHubEvents(value: unknown): HubEvent[] | undefined {
