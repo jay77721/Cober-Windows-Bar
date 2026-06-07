@@ -35,6 +35,15 @@ export type ProviderRegistryCapabilitySupportRecord = {
   capability: HubProviderCapability;
 };
 
+export type ProviderRegistryCapabilitySupportSummary = {
+  kind: HubProviderCapability["kind"];
+  origin: HubProviderCapability["origin"];
+  support: HubProviderCapability["support"];
+  capabilityCount: number;
+  providerCount: number;
+  providerIds: string[];
+};
+
 type ProviderRegistryEntry = {
   provider: HubProvider;
   registrationOrder: number;
@@ -65,6 +74,43 @@ function snapshotCapabilitySupport(
     providerKind: provider.metadata.kind,
     registrationOrder,
     capability: { ...capability },
+  }));
+}
+
+function summarizeCapabilitySupportRecords(
+  records: ProviderRegistryCapabilitySupportRecord[],
+): ProviderRegistryCapabilitySupportSummary[] {
+  const summaries = new Map<string, ProviderRegistryCapabilitySupportSummary & { providerIdsSet: Set<string> }>();
+
+  records.forEach((record) => {
+    const { capability } = record;
+    const key = `${capability.kind}:${capability.origin}:${capability.support}`;
+    const existing =
+      summaries.get(key) ??
+      {
+        kind: capability.kind,
+        origin: capability.origin,
+        support: capability.support,
+        capabilityCount: 0,
+        providerCount: 0,
+        providerIds: [],
+        providerIdsSet: new Set<string>(),
+      };
+
+    existing.capabilityCount += 1;
+
+    if (!existing.providerIdsSet.has(record.providerId)) {
+      existing.providerIdsSet.add(record.providerId);
+      existing.providerIds.push(record.providerId);
+      existing.providerCount += 1;
+    }
+
+    summaries.set(key, existing);
+  });
+
+  return [...summaries.values()].map(({ providerIdsSet, ...summary }) => ({
+    ...summary,
+    providerIds: [...summary.providerIds],
   }));
 }
 
@@ -116,6 +162,10 @@ export function createProviderRegistry() {
       return [...entries.values()]
         .sort((left, right) => left.registrationOrder - right.registrationOrder)
         .flatMap(snapshotCapabilitySupport);
+    },
+
+    summarizeCapabilitySupport() {
+      return summarizeCapabilitySupportRecords(this.listCapabilitySupport());
     },
 
     unregister(providerId: string) {

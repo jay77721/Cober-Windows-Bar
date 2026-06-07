@@ -215,6 +215,117 @@ test("registry capability support preserves native preflight facts without provi
   assert.equal(nativePreflight.subscribeCalls, 0);
 });
 
+test("registry summarizes capability support as diagnostic aggregate facts", () => {
+  const registry = createProviderRegistry();
+  const nativePreflight = providerWithSpies("native-music-preflight");
+
+  nativePreflight.provider.metadata = {
+    ...nativePreflight.provider.metadata,
+    name: "Native Music Capability Preflight",
+    mock: false,
+  };
+  nativePreflight.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+  ];
+
+  registry.register(createMockMusicProvider());
+  registry.register(createMockAIProvider());
+  registry.register(nativePreflight.provider);
+
+  const summary = registry.summarizeCapabilitySupport();
+
+  assert.deepEqual(summary, [
+    {
+      kind: "music",
+      origin: "mock",
+      support: "available",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["mock-music-provider"],
+    },
+    {
+      kind: "ai",
+      origin: "mock",
+      support: "available",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["mock-ai-task-provider"],
+    },
+    {
+      kind: "music",
+      origin: "native",
+      support: "preflight",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["native-music-preflight"],
+    },
+  ]);
+  assert.equal(nativePreflight.startCalls, 0);
+  assert.equal(nativePreflight.stopCalls, 0);
+  assert.equal(nativePreflight.subscribeCalls, 0);
+});
+
+test("registry capability support summary is copied and excludes lifecycle claims", () => {
+  const registry = createProviderRegistry();
+  const nativePreflight = providerWithSpies("native-music-preflight");
+
+  nativePreflight.provider.metadata = {
+    ...nativePreflight.provider.metadata,
+    mock: false,
+  };
+  nativePreflight.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+    {
+      id: "music",
+      kind: "music",
+      origin: "native",
+      support: "unsupported",
+    },
+  ];
+
+  registry.register(nativePreflight.provider);
+
+  const summary = registry.summarizeCapabilitySupport();
+
+  summary[0]?.providerIds.push("mutated-provider");
+
+  assert.deepEqual(registry.summarizeCapabilitySupport(), [
+    {
+      kind: "music",
+      origin: "native",
+      support: "preflight",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["native-music-preflight"],
+    },
+    {
+      kind: "music",
+      origin: "native",
+      support: "unsupported",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["native-music-preflight"],
+    },
+  ]);
+
+  for (const item of summary) {
+    assert.equal("status" in item, false);
+    assert.equal("lifecycle" in item, false);
+    assert.equal("health" in item, false);
+    assert.equal("available" in item, false);
+    assert.equal("ready" in item, false);
+    assert.equal("connected" in item, false);
+    assert.equal("implemented" in item, false);
+  }
+  assert.equal(nativePreflight.startCalls, 0);
+  assert.equal(nativePreflight.stopCalls, 0);
+  assert.equal(nativePreflight.subscribeCalls, 0);
+});
+
 test("registry list returns a copy instead of mutable internal array", () => {
   const registry = createProviderRegistry();
   registry.register(createMockMusicProvider());
