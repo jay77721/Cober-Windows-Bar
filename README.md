@@ -1,12 +1,12 @@
 # Cober-Windows-Bar
 
-Windows 11-style status hub showcase for proving glanceable desktop state flows before native integration work begins.
+Windows 11-style status hub showcase for proving glanceable desktop state flows and the mock/fixture runtime boundary before real native integration work begins.
 
-Current release track: **v0.3.4 README & Demo Asset Polish**.
+Current release track: **v0.7 mock/fixture runtime boundary and Showcase polish**.
 
 ## Current Status
 
-Cober-Windows-Bar is currently a mock-only `/showcase` experience. It demonstrates the product direction for a lightweight Windows 11 status surface, but it is not a native desktop app yet.
+Cober-Windows-Bar is currently a mock and fixture-driven `/showcase` experience. It demonstrates the product direction for a lightweight Windows 11 status surface and now includes a narrow v0.7 Tauri/runtime boundary proof, but it is not a real native integration yet.
 
 What exists today:
 
@@ -15,11 +15,17 @@ What exists today:
 - Auto Demo flow for recording state transitions.
 - Resolver visualization for active events, resolver output, and current mode.
 - Mock Provider SDK demo that feeds provider-style events into the same resolver path.
+- Tauri fixture command and runtime adapter scaffold for canonical mock `HubEvent` fixtures.
+- Runtime bridge proof that fixture events can enter the Event Bus boundary.
+- Explicit Showcase playground entry for the Tauri fixture path.
+- Store-derived main preview data and a status header that connects the resolved Hub preview to the active event source.
+- QA coverage that includes state, provider, runtime bridge, build, and Showcase interaction checks.
 
 What does not exist yet:
 
-- No Tauri shell, tray, always-on-top windowing, IPC, or native desktop packaging.
+- No real Windows provider implementation or native system integration.
 - No Windows/system APIs, media-session readers, notification readers, file watchers, or OS hooks.
+- No Tauri tray, always-on-top behavior, production packaging, signing, updater, or installer.
 - No real providers or external integrations.
 
 ## What It Proves
@@ -34,11 +40,12 @@ The current showcase proves the front-end interaction model and provider boundar
 Event flow:
 
 ```text
-Mock Provider / Event Playground
+Event Playground / Mock Provider / Tauri Fixture
   -> publishHubEvent()
-  -> store
-  -> resolver
-  -> showcased Hub UI
+  -> Event Bus
+  -> Store
+  -> Resolver
+  -> Store-derived Showcase Hub UI
 ```
 
 ## Try It
@@ -92,9 +99,9 @@ Screenshots are written to `output/playwright/` as local QA artifacts and are no
 - **Stage 0: UI prototype** - Win11/Mica showcase with the core hub states.
 - **Stage 1: Event Playground** - mock event controls, resolver visualization, and Auto Demo.
 - **Stage 2: Provider SDK** - mock providers and adapter validation, still without real system integration.
-- **v0.3.x: Showcase polish** - keep `/showcase`, demo capture, and mock Provider SDK reviewable.
-- **Stage 3: Tauri shell** - add desktop shell behavior, native windowing, tray, IPC, and packaging.
-- **Stage 4: Real providers** - connect system, music, download, notification, and AI task sources.
+- **v0.7: Runtime boundary and Showcase polish** - prove mock/fixture Tauri IPC events can cross into the existing Event Bus -> Store -> Resolver -> UI path.
+- **Stage 3: Desktop shell hardening** - continue Tauri shell work after the boundary proof, without claiming tray, always-on-top, or production packaging yet.
+- **Stage 4: Real providers** - connect system, music, download, notification, and AI task sources after the native boundary is ready.
 - **Stage 5+: Developer and agent hub** - add Git, Docker, WSL, build tool, and long-running AI work status surfaces.
 
 ## Documentation

@@ -4,7 +4,9 @@
 
 Cober-Windows-Bar is a **Windows 11 Unified Status Hub**. It starts as a visual and interaction prototype, then gradually grows into a native-feeling desktop surface for status, developer work, and AI agent activity.
 
-The current route is post-v0.6 provider alignment. v0.6 closed the mock Provider SDK alignment at `92f3e01 test: harden provider alignment coverage`. The next route checkpoint is v0.7 Tauri shell/runtime/IPC boundary planning and scope freeze. It does not authorize Tauri, Rust, IPC, real providers, Windows/system APIs, system tray behavior, always-on-top windowing, package/script changes, assets, or a `/showcase` visual redesign.
+The current route is v0.7 mock/fixture runtime boundary proof and Showcase polish. v0.6 closed the mock Provider SDK alignment at `92f3e01 test: harden provider alignment coverage`. Since then, narrow v0.7 slices have landed to prove fixture events can cross the Tauri/runtime boundary and still flow through the existing Event Bus, Store, Resolver, and Showcase UI path.
+
+The completed v0.7 slices are still mock/fixture-only. They do not implement real providers, Windows/system APIs, Tauri tray behavior, always-on-top windowing, production packaging, signing, updater, installer behavior, or real native integration.
 
 ## 2. Stage Route
 
@@ -12,7 +14,7 @@ The current route is post-v0.6 provider alignment. v0.6 closed the mock Provider
 - **Stage 1: Event Playground** - done as v0.2. Proved state transitions with mock Event Controls, Auto Demo playback, and Resolver Visualization.
 - **Stage 2: Architecture Planning** - closed v0.4. Documented runtime boundaries and future Tauri/Windows architecture needs only.
 - **Stage 3: Mock Provider SDK Planning and Alignment** - v0.5/v0.6. Define and align provider lifecycle, registry, runtime, test strategy, mock providers, and provider tests; no Windows/system integration.
-- **Stage 4: Tauri Shell Runtime Spike** - v0.7. Plan and freeze the shell/runtime/IPC boundary, then prove it with mock or fixture events only if separately approved.
+- **Stage 4: Tauri Shell Runtime Spike** - v0.7. Freeze and prove the shell/runtime/IPC boundary with mock or fixture events only.
 - **Stage 5: First Real Provider** - v0.8 or later. First real system integration after the Tauri boundary is proven.
 - **Stage 6: Developer Hub** - v0.9 or later. Add Git, Docker, WSL, Maven, Gradle, npm/pnpm, Cargo, and developer workflow surfaces.
 - **Stage 7: AI Agent Hub** - v1.0. Add Codex, Claude, GPT/OpenCode/Gemini-style agent status, queue state, progress, and multi-agent visibility.
@@ -168,9 +170,9 @@ v0.6 implemented provider alignment scope:
 
 v0.6 does not include Tauri, IPC, Rust, Windows APIs, real providers, media sessions, notification center readers, download monitoring, tray behavior, always-on-top behavior, or packaging work. Those remain later-stage planning or implementation items after the mock provider runtime slice is proven.
 
-## 8. v0.7 Tauri Scope Freeze
+## 8. v0.7 Tauri Runtime Boundary Proof
 
-v0.7 should first freeze the Tauri shell/runtime/IPC boundary before any native implementation starts.
+v0.7 freezes and proves the Tauri shell/runtime/IPC boundary before any real native provider implementation starts.
 
 Goal:
 
@@ -179,9 +181,20 @@ Goal:
 - Keep the UI agnostic to whether events came from mock providers, IPC fixtures, or future Windows providers.
 - Define boundary diagnostics for unavailable native runtime data or malformed IPC payloads.
 
+Completed narrow slices:
+
+- Tauri fixture command and IPC fixture boundary scaffold.
+- Frontend runtime adapter for Tauri invoke detection, fixture loading, malformed data handling, and unavailable/invoke-failed diagnostics.
+- Runtime bridge proof that fixture events can be published through the Event Bus boundary.
+- Explicit Showcase playground entry for manually triggering the Tauri fixture path.
+- Runtime bridge tests included in the standard `npm run qa` gate.
+- Showcase interaction QA process cleanup and Windows/Vite path documentation.
+- Store-derived `tasks`, `music`, and `notification` data fed into the main Hub preview.
+- Showcase preview status polish that exposes active mode, event count, and current mock/fixture source in the main preview.
+
 Minimum success criteria:
 
-- The Tauri spike has a narrow goal and explicit non-goals.
+- The Tauri spike has a narrow mock/fixture goal and explicit non-goals.
 - Mock or fixture canonical HubEvents remain the only data source.
 - The spike does not bypass Event Bus, Store, Resolver, or UI boundaries.
 - Failure handling is defined as boundary diagnostics, not as real provider behavior.
@@ -191,6 +204,7 @@ Non-goals:
 
 - Windows APIs, media sessions, file watchers, or system notification readers
 - Real provider implementations
+- Tauri tray, always-on-top windowing, or production packaging
 - `/showcase` visual redesigns
 - Store, Resolver, or ProviderRegistry expansion
 - Broad Rust module design
