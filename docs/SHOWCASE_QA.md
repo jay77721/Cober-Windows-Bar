@@ -24,13 +24,13 @@ Run state tests and production build:
 npm run qa
 ```
 
-Run the repeatable interaction check for the Provider Demo flow:
+Run the repeatable interaction check for the Showcase Provider Demo and Tauri Fixture flows:
 
 ```bash
 npm run qa:showcase:interactions
 ```
 
-The script verifies `/showcase`, Provider Demo source switching, Stop provider, Clear to idle, and console/page errors. It starts a local Vite server if one is not already available.
+The script verifies `/showcase`, Provider Demo source switching, Stop provider, Clear to idle, Tauri Fixture publishing, stale fixture/request cancellation after Clear to idle, and console/page errors. It starts a local Vite server if one is not already available.
 
 ### Interaction QA server paths on Windows
 
@@ -131,6 +131,8 @@ Resolver Visualization:
 - Provider Demo Notify feeds a mock provider event through the existing event bus/store/resolver path.
 - Stop provider stops the provider source without pretending to clear already visible events.
 - Clear to idle stops the provider source, clears active events, and resolves back to Idle.
+- Tauri Fixture publishes the injected runtime fixture through the existing event bus/store/resolver path and resolves to AI Progress.
+- Clear to idle prevents a delayed Tauri Fixture request from republishing stale fixture content or updating the playground label afterward.
 - The page still does not use real Windows APIs, system notification readers, media-session readers, file watchers, or Tauri IPC.
 
 ## Acceptance Checklist
