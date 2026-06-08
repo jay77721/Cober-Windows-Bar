@@ -169,6 +169,47 @@ test("store derives task display fields from event payload", () => {
   assert.equal(state.tasks[0]?.subtitle, "正在生成代码...");
 });
 
+test("store notification snapshots do not expose mutable event payloads", () => {
+  const notificationPayload = {
+    app: "Cober",
+    sender: "Mock Provider",
+    message: "Original message",
+  };
+  const state = createHubStoreState(
+    [event({ id: "notification", type: "notification", payload: notificationPayload })],
+    now,
+  );
+
+  if (!state.notification) {
+    throw new Error("expected notification snapshot");
+  }
+
+  state.notification.message = "Mutated outside store";
+
+  assert.equal(notificationPayload.message, "Original message");
+});
+
+test("store music snapshots do not expose mutable event payloads", () => {
+  const musicPayload = {
+    title: "Original track",
+    subtitle: "Original artist",
+    time: "1:00 / 3:00",
+    progress: 33,
+  };
+  const state = createHubStoreState(
+    [event({ id: "music", type: "music", payload: musicPayload })],
+    now,
+  );
+
+  if (!state.music) {
+    throw new Error("expected music snapshot");
+  }
+
+  state.music.title = "Mutated outside store";
+
+  assert.equal(musicPayload.title, "Original track");
+});
+
 test("event demo scenarios resolve to their expected hub modes", () => {
   for (const scenario of createHubDemoScenarios(now)) {
     assert.equal(resolveHubMode(scenario.events, now), scenario.expectedMode);

@@ -69,11 +69,11 @@ export function createHubStoreState(events: HubEvent[], now = Date.now()): HubSt
     tasks,
     notification:
       notificationEvent && notificationEvent.payload && "message" in notificationEvent.payload
-        ? notificationEvent.payload
+        ? { ...notificationEvent.payload }
         : undefined,
     music:
       musicEvent && musicEvent.payload && "time" in musicEvent.payload
-        ? musicEvent.payload
+        ? { ...musicEvent.payload }
         : undefined,
   };
 }
