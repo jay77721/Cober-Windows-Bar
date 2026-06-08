@@ -10,6 +10,7 @@ import {
   type TauriInvoke,
 } from "./tauriRuntime";
 import type { HubEvent } from "../types/hub";
+import type { HubProviderCapability } from "../providers/types";
 
 const tests: Array<{ name: string; run: () => void | Promise<void> }> = [];
 
@@ -286,6 +287,35 @@ test("loads canonical runtime capability facts through the configured command", 
 
   if (result.ok) {
     assert.deepEqual(result.capabilities, canonicalRuntimeCapabilities);
+  }
+});
+
+test("keeps runtime Windows provider facts compatible with music preflight diagnostics", async () => {
+  const result = await loadTauriRuntimeCapabilities({
+    invoke: async () => canonicalRuntimeCapabilities,
+  });
+  const musicPreflightDiagnostic: HubProviderCapability = {
+    id: "music",
+    kind: "music",
+    origin: "native",
+    support: "preflight",
+  };
+
+  assert.equal(result.ok, true);
+
+  if (result.ok) {
+    assert.equal(result.capabilities.windowsProviders, false);
+    assert.deepEqual(musicPreflightDiagnostic, {
+      id: "music",
+      kind: "music",
+      origin: "native",
+      support: "preflight",
+    });
+    assert.notEqual(musicPreflightDiagnostic.support, "available");
+    assert.equal("ready" in musicPreflightDiagnostic, false);
+    assert.equal("connected" in musicPreflightDiagnostic, false);
+    assert.equal("implemented" in musicPreflightDiagnostic, false);
+    assert.equal("active" in musicPreflightDiagnostic, false);
   }
 });
 

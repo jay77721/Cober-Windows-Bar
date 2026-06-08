@@ -476,6 +476,53 @@ test("registry capability support summary is copied and excludes lifecycle claim
   assert.equal(nativePreflight.subscribeCalls, 0);
 });
 
+test("registry diagnostic summary coexists with runtime Windows provider facts", () => {
+  const registry = createProviderRegistry();
+  const nativePreflight = providerWithSpies("native-music-preflight");
+  const runtimeDiagnosticFacts = {
+    windowsProviders: false,
+  };
+
+  nativePreflight.provider.metadata = {
+    ...nativePreflight.provider.metadata,
+    mock: false,
+  };
+  nativePreflight.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+  ];
+
+  registry.register(nativePreflight.provider);
+
+  const summary = registry.summarizeCapabilitySupport();
+
+  assert.equal(runtimeDiagnosticFacts.windowsProviders, false);
+  assert.deepEqual(summary, [
+    {
+      kind: "music",
+      origin: "native",
+      support: "preflight",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["native-music-preflight"],
+    },
+  ]);
+  assert.equal(
+    summary.some((item) => item.origin === "native" && item.support === "available"),
+    false,
+  );
+  for (const item of summary) {
+    assert.equal("ready" in item, false);
+    assert.equal("connected" in item, false);
+    assert.equal("implemented" in item, false);
+    assert.equal("active" in item, false);
+  }
+  assert.equal(nativePreflight.startCalls, 0);
+  assert.equal(nativePreflight.stopCalls, 0);
+  assert.equal(nativePreflight.subscribeCalls, 0);
+});
+
 test("registry list returns a copy instead of mutable internal array", () => {
   const registry = createProviderRegistry();
   registry.register(createMockMusicProvider());
