@@ -177,6 +177,17 @@ test("store clamps task progress into the canonical display range", () => {
   assert.equal(lowProgressState.tasks[0]?.progress, 0);
 });
 
+test("store normalizes non-finite task progress to zero", () => {
+  const nanProgressState = createHubStoreState([event({ id: "nan", progress: Number.NaN })], now);
+  const infinityProgressState = createHubStoreState(
+    [event({ id: "infinity", progress: Number.POSITIVE_INFINITY })],
+    now,
+  );
+
+  assert.equal(nanProgressState.tasks[0]?.progress, 0);
+  assert.equal(infinityProgressState.tasks[0]?.progress, 0);
+});
+
 test("store defaults task progress to zero for progress-rendering modes", () => {
   const aiState = createHubStoreState([event({ id: "ai", type: "ai", progress: undefined })], now);
   const downloadState = createHubStoreState(
@@ -253,6 +264,37 @@ test("store clamps music progress into the canonical display range", () => {
 
   assert.equal(highProgressState.music?.progress, 100);
   assert.equal(lowProgressState.music?.progress, 0);
+});
+
+test("store normalizes non-finite music progress to zero", () => {
+  const nanProgressState = createHubStoreState(
+    [
+      event({
+        id: "music-nan",
+        type: "music",
+        payload: { title: "Track", subtitle: "Artist", time: "1:00 / 3:00", progress: Number.NaN },
+      }),
+    ],
+    now,
+  );
+  const infinityProgressState = createHubStoreState(
+    [
+      event({
+        id: "music-infinity",
+        type: "music",
+        payload: {
+          title: "Track",
+          subtitle: "Artist",
+          time: "1:00 / 3:00",
+          progress: Number.POSITIVE_INFINITY,
+        },
+      }),
+    ],
+    now,
+  );
+
+  assert.equal(nanProgressState.music?.progress, 0);
+  assert.equal(infinityProgressState.music?.progress, 0);
 });
 
 test("store event snapshots do not expose mutable event payload references", () => {

@@ -7,7 +7,7 @@ const taskAccentMap = {
   notification: "cyan",
 } as const;
 
-const clampProgress = (value: number) => Math.max(0, Math.min(value, 100));
+const clampProgress = (value: number) => (Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 0);
 
 export function getActiveHubEvents(events: HubEvent[], now = Date.now()) {
   return events
