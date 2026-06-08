@@ -98,6 +98,36 @@ test("event bus publishes latest state and replaces events by id", () => {
   unsubscribe();
 });
 
+test("event bus cleanup removes expired events and notifies subscribers", () => {
+  const bus = createHubEventBus([
+    event({ id: "expired", type: "notification", expiresAt: now - 1 }),
+    event({ id: "download", type: "download", createdAt: now - 2000 }),
+  ]);
+  const observedEventIds: string[][] = [];
+  const unsubscribe = bus.subscribe((state) =>
+    observedEventIds.push(state.events.map((item) => item.id)),
+  );
+
+  assert.deepEqual(
+    bus.getState(now - 2).events.map((item) => item.id),
+    ["expired", "download"],
+  );
+
+  bus.clearExpiredEvents(now);
+
+  assert.deepEqual(
+    bus.getState(now - 2).events.map((item) => item.id),
+    ["download"],
+  );
+  assert.deepEqual(
+    bus.getState(now).events.map((item) => item.id),
+    ["download"],
+  );
+  assert.deepEqual(observedEventIds, [["download"], ["download"]]);
+
+  unsubscribe();
+});
+
 test("store derives task display fields from event payload", () => {
   const state = createHubStoreState([event()], now);
 
