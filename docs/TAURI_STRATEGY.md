@@ -51,6 +51,7 @@ Architecture needs:
 Current v0.7 diagnostic facts:
 
 - Fixture event loading reports `surface: "fixtureEvents"` and the intended `get_hub_event_fixtures` command.
+- Fixture events are copied at the runtime load and publish boundaries so Event Bus publication cannot mutate the returned runtime result payloads or metadata.
 - Runtime capability loading reports `surface: "runtimeCapabilities"` and the intended `get_runtime_capabilities` command.
 - Runtime capabilities remain static and truthful: fixture IPC can be reported, configured shell-window facts can be reported, and `windowsProviders`, tray, and always-on-top remain `false`.
 - Provider capability diagnostics may include `origin: "native"` and `support: "preflight"` for music, but that is only a preflight descriptor for future work.
