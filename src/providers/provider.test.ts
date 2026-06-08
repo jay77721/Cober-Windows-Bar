@@ -360,6 +360,34 @@ test("mock provider listener errors do not block later listeners", () => {
   unsubscribeLater();
 });
 
+test("mock provider listener event batches do not share mutable payload references", () => {
+  const provider = createMockMusicProvider({ now });
+  let firstBatch: unknown;
+  let laterTitle = "";
+  const unsubscribeFirst = provider.subscribe((events) => {
+    firstBatch = events;
+    const payload = events[0]?.payload as { title: string } | undefined;
+
+    if (!payload) {
+      throw new Error("expected music payload");
+    }
+
+    payload.title = "Mutated by first listener";
+    events.pop();
+  });
+  const unsubscribeLater = provider.subscribe((events) => {
+    laterTitle = (events[0]?.payload as { title?: string } | undefined)?.title ?? "";
+    assert.notEqual(events, firstBatch);
+  });
+
+  provider.start();
+
+  assert.equal(laterTitle, "Midnight City");
+
+  unsubscribeFirst();
+  unsubscribeLater();
+});
+
 test("AI and download mock fixtures keep deterministic fixed progress", () => {
   const ai = createMockAiTaskEvent({ now });
   const download = createMockDownloadEvent({ now });

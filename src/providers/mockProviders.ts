@@ -25,6 +25,14 @@ const resolveNow = (options: MockProviderOptions = {}) => {
 const createEventId = (providerId: string, type: HubEvent["type"], timestamp: number) =>
   `${providerId}-${type}-${timestamp}`;
 
+function snapshotHubEvent(event: HubEvent): HubEvent {
+  return {
+    ...event,
+    payload: event.payload ? { ...event.payload } : undefined,
+    metadata: event.metadata ? { ...event.metadata } : undefined,
+  };
+}
+
 export const createMockMusicEvent = (options: MockProviderOptions = {}): HubEvent => {
   const createdAt = resolveNow(options);
 
@@ -112,7 +120,7 @@ const createMockProvider = ({ metadata, capabilities, events }: MockProviderConf
     const nextEvents = events();
     listeners.forEach((listener) => {
       try {
-        listener(nextEvents);
+        listener(nextEvents.map(snapshotHubEvent));
       } catch {
         // Listener failures should not block unrelated provider subscribers.
       }
