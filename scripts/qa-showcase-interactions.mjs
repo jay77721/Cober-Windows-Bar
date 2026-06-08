@@ -108,6 +108,10 @@ async function expectButton(locator, name, timeout = 5_000) {
   await locator.getByRole("button", { name, exact: true }).waitFor({ state: "visible", timeout });
 }
 
+async function expectLink(locator, name, timeout = 5_000) {
+  await locator.getByRole("link", { name, exact: true }).waitFor({ state: "visible", timeout });
+}
+
 async function expectNoText(locator, text, timeout = 5_000) {
   await locator.getByText(text, { exact: true }).waitFor({ state: "detached", timeout });
 }
@@ -195,6 +199,8 @@ async function run() {
     await expectButton(page, "File shortcut mock");
     await expectButton(page, "Browser shortcut mock");
     await expectProgressBar(page, "Taskbar AI progress");
+    await expectText(page, "Mica background");
+    await expectText(page, "Position mock");
     await expectProgressBar(page, "Fluent music progress token");
     await expectProgressBar(page, "Fluent AI progress token");
     await expectProgressBar(page, "Fluent download progress token");
@@ -271,6 +277,15 @@ async function run() {
         ].join("\n"),
       );
     }
+
+    const missingResponse = await page.goto(`${baseUrl}/missing`, { waitUntil: "networkidle" });
+
+    if (!missingResponse || missingResponse.status() !== 200) {
+      throw new Error(`/missing returned ${missingResponse?.status() ?? "no response"}`);
+    }
+
+    await expectText(page, "Showcase page not found");
+    await expectLink(page, "Open /showcase");
 
     console.log(`Showcase interaction QA passed at ${showcaseUrl}${startedServer ? " (started Vite)" : ""}`);
   } catch (error) {
