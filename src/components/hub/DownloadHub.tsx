@@ -17,7 +17,7 @@ export function DownloadHub({ task }: DownloadHubProps) {
         </div>
         <div className="mt-1 truncate text-xs text-slate-300">{task.subtitle}</div>
         <div className="mt-3">
-          <ProgressBar value={task.progress ?? 0} tone="green" />
+          <ProgressBar value={task.progress ?? 0} tone="green" label="Download progress" />
         </div>
       </div>
     </div>

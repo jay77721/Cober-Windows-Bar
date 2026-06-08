@@ -16,7 +16,7 @@ export function MusicHub({ music }: MusicHubProps) {
         <div className="truncate text-sm font-semibold text-white">{music.title}</div>
         <div className="truncate text-xs text-slate-300">{music.subtitle}</div>
         <div className="mt-2 flex items-center gap-3">
-          <ProgressBar value={music.progress} tone="pink" />
+          <ProgressBar value={music.progress} tone="pink" label="Music playback progress" />
           <span className="whitespace-nowrap text-xs text-slate-300">{music.time}</span>
         </div>
       </div>

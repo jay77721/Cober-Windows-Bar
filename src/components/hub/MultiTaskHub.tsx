@@ -24,7 +24,9 @@ export function MultiTaskHub({ tasks }: MultiTaskHubProps) {
               <div className="truncate text-sm font-semibold text-white">{task.title}</div>
               <div className="mt-1 truncate text-xs text-slate-300">{task.subtitle}</div>
               <div className="mt-1.5">
-                {task.progress !== undefined && <ProgressBar value={task.progress} tone={toneMap[task.type]} />}
+                {task.progress !== undefined && (
+                  <ProgressBar value={task.progress} tone={toneMap[task.type]} label={`${task.title} progress`} />
+                )}
               </div>
             </div>
             <span className="text-right text-xs tabular-nums text-slate-100">
