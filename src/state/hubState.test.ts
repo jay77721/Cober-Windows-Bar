@@ -31,7 +31,7 @@ function event(overrides: Partial<HubEvent> = {}): HubEvent {
 
 function test(name: string, run: () => void) {
   run();
-  console.log(`✓ ${name}`);
+  console.log(`ok ${name}`);
 }
 
 test("resolves idle when there are no active events", () => {
