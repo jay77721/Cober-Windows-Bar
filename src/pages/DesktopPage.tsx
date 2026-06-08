@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BatteryMedium, Bell, Bot, Download, Music2, Wifi } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { BatteryMedium, Bell, Bot, Circle, Download, Layers3, Music2, Pause, Play, Wifi } from "lucide-react";
 import { HubShell } from "../components/hub/HubShell";
 import { createHubDemoScenario, playHubDemoScenario, type HubDemoScenarioId } from "../state/hubScenarios";
 import { createHubEventBus } from "../state/hubState";
@@ -16,12 +16,40 @@ const modeLabel: Record<HubMode, string> = {
   multiTask: "Multi",
 };
 
+const modeSummary: Record<HubMode, string> = {
+  idle: "No urgent desktop state. The hub stays compact and ready.",
+  music: "Playback owns the glance surface with media controls and progress.",
+  aiProgress: "AI work is active, so progress takes priority over passive state.",
+  download: "A file transfer is active and promoted into the desktop hub.",
+  notification: "Notification priority interrupts the lower-priority task stream.",
+  multiTask: "Multiple active tasks collapse into one combined status center.",
+};
+
+const sources: Array<{ id: HubDemoScenarioId; label: string; icon: typeof Music2; mode: HubMode }> = [
+  { id: "idle", label: "Idle", icon: Circle, mode: "idle" },
+  { id: "music", label: "Music", icon: Music2, mode: "music" },
+  { id: "ai", label: "AI", icon: Bot, mode: "aiProgress" },
+  { id: "download", label: "Download", icon: Download, mode: "download" },
+  { id: "notification", label: "Notify", icon: Bell, mode: "notification" },
+  { id: "multiTask", label: "Stack", icon: Layers3, mode: "multiTask" },
+];
+
 export function DesktopPage() {
   const eventBus = useMemo(() => createHubEventBus(), []);
   const [storeState, setStoreState] = useState<HubStoreState>(() => eventBus.getState());
   const [stepIndex, setStepIndex] = useState(0);
+  const [autoRun, setAutoRun] = useState(true);
 
   useEffect(() => eventBus.subscribe(setStoreState), [eventBus]);
+
+  const playSource = useCallback(
+    (scenarioId: HubDemoScenarioId) => {
+      const nextIndex = desktopSequence.indexOf(scenarioId);
+      setStepIndex(nextIndex >= 0 ? nextIndex : 0);
+      playHubDemoScenario(eventBus, createHubDemoScenario(scenarioId, Date.now()), Date.now());
+    },
+    [eventBus],
+  );
 
   useEffect(() => {
     const scenarioId = desktopSequence[stepIndex % desktopSequence.length] ?? "idle";
@@ -29,31 +57,102 @@ export function DesktopPage() {
   }, [eventBus, stepIndex]);
 
   useEffect(() => {
+    if (!autoRun) {
+      return;
+    }
+
     const timer = window.setInterval(() => {
       setStepIndex((current) => (current + 1) % desktopSequence.length);
-    }, 2600);
+    }, 3200);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [autoRun]);
+
+  const activeEvent = storeState.events[0];
+  const activeSource = sources.find((source) => source.mode === storeState.mode) ?? sources[0]!;
 
   return (
     <main className="desktop-preview min-h-screen overflow-hidden text-slate-50" data-testid="desktop-preview">
       <div className="desktop-preview-wallpaper" aria-hidden="true" />
 
-      <section className="desktop-hub-stage" aria-label="Desktop status hub preview">
-        <div className="desktop-hub-anchor">
-          <div className="mb-3 flex items-center justify-between gap-3 px-2 text-xs text-slate-200/85">
-            <span className="font-semibold tracking-normal">Cober Windows Bar</span>
-            <span className="rounded-full border border-white/12 bg-white/[0.08] px-2 py-0.5">
-              Mock desktop preview
-            </span>
+      <section className="desktop-status-center" aria-label="Desktop status center prototype">
+        <div className="desktop-status-shell">
+          <header className="desktop-status-header">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/70">Cober Windows Bar</div>
+              <h1 className="mt-1 text-lg font-semibold text-white">Desktop status center</h1>
+            </div>
+            <button
+              type="button"
+              aria-label={autoRun ? "Pause automatic mock stream" : "Play automatic mock stream"}
+              onClick={() => setAutoRun((current) => !current)}
+              className="desktop-run-toggle"
+            >
+              {autoRun ? <Pause size={15} /> : <Play size={15} />}
+              {autoRun ? "Auto" : "Manual"}
+            </button>
+          </header>
+
+          <div className="desktop-status-grid">
+            <nav className="desktop-source-rail" aria-label="Mock status sources">
+              {sources.map((source) => {
+                const Icon = source.icon;
+                const selected = activeSource.id === source.id;
+
+                return (
+                  <button
+                    key={source.id}
+                    type="button"
+                    aria-pressed={selected}
+                    className={`desktop-source-button ${selected ? "desktop-source-button-active" : ""}`}
+                    onClick={() => {
+                      setAutoRun(false);
+                      playSource(source.id);
+                    }}
+                  >
+                    <Icon size={16} />
+                    <span>{source.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <section className="desktop-hub-stage" aria-label="Resolved desktop hub">
+              <div className="desktop-hub-anchor">
+                <div className="desktop-hub-meta">
+                  <span>{modeLabel[storeState.mode]}</span>
+                  <span>{storeState.events.length} active</span>
+                  <span>Mock sources</span>
+                </div>
+                <HubShell
+                  mode={storeState.mode}
+                  tasks={storeState.tasks}
+                  music={storeState.music}
+                  notification={storeState.notification}
+                />
+              </div>
+            </section>
+
+            <aside className="desktop-inspector" aria-label="Current state summary">
+              <div className="desktop-inspector-card">
+                <div className="text-xs font-semibold uppercase tracking-normal text-slate-400">Focus</div>
+                <div className="mt-2 text-base font-semibold text-white">{modeLabel[storeState.mode]}</div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{modeSummary[storeState.mode]}</p>
+              </div>
+
+              <div className="desktop-inspector-card">
+                <div className="text-xs font-semibold uppercase tracking-normal text-slate-400">Current source</div>
+                <div className="mt-2 truncate text-sm font-semibold text-white">{activeEvent?.id ?? "No active event"}</div>
+                <div className="mt-1 text-xs text-slate-400">{activeEvent ? `${activeEvent.type} from ${activeEvent.source}` : "Waiting for a source"}</div>
+              </div>
+
+              <div className="desktop-inspector-card">
+                <div className="text-xs font-semibold uppercase tracking-normal text-slate-400">Runtime</div>
+                <div className="mt-2 text-sm font-semibold text-white">Windows context mock</div>
+                <p className="mt-1 text-xs leading-5 text-slate-400">No native providers, tray, or always-on-top behavior are active in this prototype.</p>
+              </div>
+            </aside>
           </div>
-          <HubShell
-            mode={storeState.mode}
-            tasks={storeState.tasks}
-            music={storeState.music}
-            notification={storeState.notification}
-          />
         </div>
       </section>
 

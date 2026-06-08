@@ -296,7 +296,10 @@ async function run() {
 
     await page.getByTestId("desktop-preview").waitFor({ state: "visible", timeout: 5_000 });
     await expectText(page, "Cober Windows Bar");
-    await expectText(page, "Mock desktop preview");
+    await expectText(page, "Desktop status center");
+    await expectText(page, "Mock sources");
+    await expectText(page, "Windows context mock");
+    await expectButton(page, "Music");
     await expectText(page, "Search mock apps");
 
     console.log(`Showcase interaction QA passed at ${showcaseUrl}${startedServer ? " (started Vite)" : ""}`);
