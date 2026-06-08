@@ -169,6 +169,14 @@ test("store derives task display fields from event payload", () => {
   assert.equal(state.tasks[0]?.subtitle, "正在生成代码...");
 });
 
+test("store clamps task progress into the canonical display range", () => {
+  const highProgressState = createHubStoreState([event({ id: "high", progress: 150 })], now);
+  const lowProgressState = createHubStoreState([event({ id: "low", progress: -20 })], now);
+
+  assert.equal(highProgressState.tasks[0]?.progress, 100);
+  assert.equal(lowProgressState.tasks[0]?.progress, 0);
+});
+
 test("store notification snapshots do not expose mutable event payloads", () => {
   const notificationPayload = {
     app: "Cober",

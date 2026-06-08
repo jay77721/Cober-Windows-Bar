@@ -7,6 +7,8 @@ const taskAccentMap = {
   notification: "cyan",
 } as const;
 
+const clampProgress = (value: number) => Math.max(0, Math.min(value, 100));
+
 export function getActiveHubEvents(events: HubEvent[], now = Date.now()) {
   return events
     .filter((event) => event.expiresAt === undefined || event.expiresAt > now)
@@ -59,7 +61,7 @@ export function eventToTask(event: HubEvent): HubTask {
     type: event.type,
     title: payload?.title ?? event.type,
     subtitle: payload?.subtitle ?? "",
-    progress: event.progress,
+    progress: event.progress === undefined ? undefined : clampProgress(event.progress),
     accent: taskAccentMap[event.type],
   };
 }
