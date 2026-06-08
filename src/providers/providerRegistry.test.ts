@@ -267,6 +267,156 @@ test("registry summarizes capability support as diagnostic aggregate facts", () 
   assert.equal(nativePreflight.subscribeCalls, 0);
 });
 
+test("registry capability support summary is empty for an empty registry", () => {
+  const registry = createProviderRegistry();
+
+  assert.deepEqual(registry.summarizeCapabilitySupport(), []);
+});
+
+test("registry capability support summary preserves first-seen bucket order", () => {
+  const registry = createProviderRegistry();
+  const first = providerWithSpies("first-diagnostic-provider");
+  const second = providerWithSpies("second-diagnostic-provider");
+
+  first.provider.metadata = {
+    ...first.provider.metadata,
+    name: "First Diagnostic Provider",
+    mock: false,
+  };
+  first.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+    {
+      id: "download",
+      kind: "download",
+      origin: "mock",
+      support: "available",
+    },
+  ];
+  second.provider.metadata = {
+    ...second.provider.metadata,
+    name: "Second Diagnostic Provider",
+    kind: "ai",
+  };
+  second.provider.capabilities = [
+    {
+      id: "ai",
+      kind: "ai",
+      origin: "mock",
+      support: "available",
+    },
+    {
+      id: "music",
+      kind: "music",
+      origin: "mock",
+      support: "available",
+    },
+  ];
+
+  registry.register(first.provider);
+  registry.register(second.provider);
+
+  assert.deepEqual(
+    registry
+      .summarizeCapabilitySupport()
+      .map((item) => [item.kind, item.origin, item.support]),
+    [
+      ["music", "native", "preflight"],
+      ["download", "mock", "available"],
+      ["ai", "mock", "available"],
+      ["music", "mock", "available"],
+    ],
+  );
+});
+
+test("registry capability support summary aggregates repeated buckets across providers and capabilities", () => {
+  const registry = createProviderRegistry();
+  const first = providerWithSpies("first-native-music-preflight");
+  const second = providerWithSpies("second-native-music-preflight");
+
+  first.provider.metadata = {
+    ...first.provider.metadata,
+    mock: false,
+  };
+  first.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+    {
+      ...musicCapabilityPreflightDescriptor,
+      id: "music-secondary",
+    },
+  ];
+  second.provider.metadata = {
+    ...second.provider.metadata,
+    mock: false,
+  };
+  second.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+  ];
+
+  registry.register(first.provider);
+  registry.register(second.provider);
+
+  assert.deepEqual(registry.summarizeCapabilitySupport(), [
+    {
+      kind: "music",
+      origin: "native",
+      support: "preflight",
+      capabilityCount: 3,
+      providerCount: 2,
+      providerIds: ["first-native-music-preflight", "second-native-music-preflight"],
+    },
+  ]);
+  assert.equal(first.startCalls, 0);
+  assert.equal(first.stopCalls, 0);
+  assert.equal(first.subscribeCalls, 0);
+  assert.equal(second.startCalls, 0);
+  assert.equal(second.stopCalls, 0);
+  assert.equal(second.subscribeCalls, 0);
+});
+
+test("registry capability support summary provider ids are copied on every call", () => {
+  const registry = createProviderRegistry();
+  const nativePreflight = providerWithSpies("native-music-preflight");
+
+  nativePreflight.provider.metadata = {
+    ...nativePreflight.provider.metadata,
+    mock: false,
+  };
+  nativePreflight.provider.capabilities = [
+    {
+      ...musicCapabilityPreflightDescriptor,
+    },
+  ];
+
+  registry.register(nativePreflight.provider);
+
+  const firstSummary = registry.summarizeCapabilitySupport();
+  const secondSummary = registry.summarizeCapabilitySupport();
+
+  assert.notEqual(firstSummary, secondSummary);
+  assert.notEqual(firstSummary[0], secondSummary[0]);
+  assert.notEqual(firstSummary[0]?.providerIds, secondSummary[0]?.providerIds);
+
+  firstSummary[0]?.providerIds.push("caller-mutated-provider");
+
+  assert.deepEqual(secondSummary, [
+    {
+      kind: "music",
+      origin: "native",
+      support: "preflight",
+      capabilityCount: 1,
+      providerCount: 1,
+      providerIds: ["native-music-preflight"],
+    },
+  ]);
+  assert.deepEqual(registry.summarizeCapabilitySupport(), secondSummary);
+});
+
 test("registry capability support summary is copied and excludes lifecycle claims", () => {
   const registry = createProviderRegistry();
   const nativePreflight = providerWithSpies("native-music-preflight");
