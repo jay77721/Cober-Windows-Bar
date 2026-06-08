@@ -427,6 +427,34 @@ test("publishes canonical fixture events through the event bus boundary", async 
   assert.equal(publishedEvents[0]?.metadata?.runtime, "tauri");
 });
 
+test("published fixture event snapshots do not expose mutable result payload references", async () => {
+  const result = await publishTauriFixtureEvents(
+    {
+      publishHubEvent(event) {
+        const payload = event.payload as { title: string } | undefined;
+        const metadata = event.metadata as { runtime: string } | undefined;
+
+        if (!payload || !metadata) {
+          throw new Error("expected fixture payload and metadata");
+        }
+
+        payload.title = "Mutated by event bus";
+        metadata.runtime = "mutated";
+      },
+    },
+    {
+      invoke: async () => [fixtureEvent()],
+    },
+  );
+
+  assert.equal(result.ok, true);
+
+  if (result.ok) {
+    assert.equal((result.events[0]?.payload as { title?: string } | undefined)?.title, "Tauri IPC fixture");
+    assert.equal(result.events[0]?.metadata?.runtime, "tauri");
+  }
+});
+
 test("keeps publishing later fixture events after one event bus publish fails", async () => {
   const fixtureEvents = [
     fixtureEvent({ id: "first-fixture" }),

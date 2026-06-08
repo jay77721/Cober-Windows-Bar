@@ -159,7 +159,7 @@ export async function publishTauriFixtureEvents(
 
   for (const event of result.events) {
     try {
-      eventBus.publishHubEvent(event);
+      eventBus.publishHubEvent(snapshotHubEvent(event));
     } catch {
       // Fixture publish failures should not block unrelated events in the same runtime batch.
     }
