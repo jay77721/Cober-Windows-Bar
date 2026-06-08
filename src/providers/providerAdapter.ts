@@ -11,7 +11,11 @@ export function connectProviderToEventBus(
 ): ProviderConnection {
   const unsubscribe = provider.subscribe((events) => {
     for (const event of events) {
-      eventBus.publishHubEvent(event);
+      try {
+        eventBus.publishHubEvent(event);
+      } catch {
+        // Publish failures should not block unrelated events in the same provider batch.
+      }
     }
   });
 

@@ -381,6 +381,57 @@ test("disconnect stops forwarding provider emissions", () => {
   assert.equal(bus.getState(now).mode, "idle");
 });
 
+test("adapter keeps forwarding later provider events after one publish fails", () => {
+  const providerEvents = [
+    { ...createMockAiTaskEvent({ now }), id: "first" },
+    { ...createMockDownloadEvent({ now }), id: "second" },
+  ];
+  const publishedEventIds: string[] = [];
+  const provider: HubProvider = {
+    id: "batch-provider",
+    label: "Batch Provider",
+    metadata: {
+      id: "batch-provider",
+      name: "Batch Provider",
+      kind: "ai",
+      version: "0.6.0",
+      mock: true,
+    },
+    capabilities: [{ id: "ai", kind: "ai", origin: "mock", support: "available" }],
+    start() {},
+    stop() {},
+    subscribe(listener) {
+      listener(providerEvents);
+      return () => {};
+    },
+    status() {
+      return {
+        lifecycle: "Publishing",
+        health: "Healthy",
+      };
+    },
+  };
+
+  assert.doesNotThrow(() =>
+    connectProviderToEventBus(provider, {
+      getState: createHubEventBus().getState,
+      clearHubEvents() {},
+      clearExpiredEvents() {},
+      subscribe() {
+        return () => {};
+      },
+      publishHubEvent(event) {
+        publishedEventIds.push(event.id);
+
+        if (event.id === "first") {
+          throw new Error("first publish failed");
+        }
+      },
+    }),
+  );
+  assert.deepEqual(publishedEventIds, ["first", "second"]);
+});
+
 test("disconnect cleanup is safe to call more than once", () => {
   const bus = createHubEventBus();
   const provider = createMockMusicProvider({ now });
