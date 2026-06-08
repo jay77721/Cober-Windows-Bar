@@ -459,3 +459,38 @@ test("disconnect cleanup is safe to call more than once", () => {
 
   assert.equal(bus.getState(now).mode, "idle");
 });
+
+test("adapter disconnect calls provider unsubscribe at most once", () => {
+  let unsubscribeCalls = 0;
+  const provider: HubProvider = {
+    id: "single-cleanup-provider",
+    label: "Single Cleanup Provider",
+    metadata: {
+      id: "single-cleanup-provider",
+      name: "Single Cleanup Provider",
+      kind: "music",
+      version: "0.6.0",
+      mock: true,
+    },
+    capabilities: [{ id: "music", kind: "music", origin: "mock", support: "available" }],
+    start() {},
+    stop() {},
+    subscribe() {
+      return () => {
+        unsubscribeCalls += 1;
+      };
+    },
+    status() {
+      return {
+        lifecycle: "Stopped",
+        health: "Healthy",
+      };
+    },
+  };
+  const connection = connectProviderToEventBus(provider, createHubEventBus());
+
+  connection.disconnect();
+  connection.disconnect();
+
+  assert.equal(unsubscribeCalls, 1);
+});

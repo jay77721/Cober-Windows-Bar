@@ -18,9 +18,15 @@ export function connectProviderToEventBus(
       }
     }
   });
+  let connected = true;
 
   return {
     disconnect() {
+      if (!connected) {
+        return;
+      }
+
+      connected = false;
       unsubscribe();
     },
   };
