@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use sysinfo::{Networks, System};
 use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager, PhysicalPosition, Position, WebviewWindow};
+use tauri::{Emitter, Manager, PhysicalPosition, Position, WebviewWindow, WindowEvent};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri_plugin_global_shortcut::ShortcutState;
 
@@ -37,6 +37,7 @@ const MENU_RESET_POSITION: &str = "reset-position";
 const MENU_OPEN_SETTINGS: &str = "open-settings";
 const MENU_QUIT: &str = "quit";
 const TRAY_MENU_SHOW_STATUS_CENTER: &str = "tray-show-status-center";
+const TRAY_MENU_OPEN_SETTINGS: &str = "tray-open-settings";
 const GLOBAL_SHORTCUT_RECALL: &str = "Alt+Shift+Space";
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -274,6 +275,12 @@ fn set_status_window_floating(window: WebviewWindow, floating: bool) -> Result<(
 
 #[tauri::command]
 fn correct_status_window_position(window: WebviewWindow) -> Result<WindowPositionCorrection, String> {
+  correct_status_window_position_for_window(&window)
+}
+
+fn correct_status_window_position_for_window<R: tauri::Runtime>(
+  window: &WebviewWindow<R>,
+) -> Result<WindowPositionCorrection, String> {
   let position = window.outer_position().map_err(|error| error.to_string())?;
   let size = window.outer_size().map_err(|error| error.to_string())?;
   let monitors = window.available_monitors().map_err(|error| error.to_string())?;
@@ -632,7 +639,7 @@ fn create_tray_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<Menu
       "\u{663E}\u{793A}\u{0020}/\u{0020}\u{53EC}\u{56DE}\u{72B6}\u{6001}\u{4E2D}\u{5FC3}",
     )
     .text(
-      MENU_OPEN_SETTINGS,
+      TRAY_MENU_OPEN_SETTINGS,
       "\u{6253}\u{5F00}\u{8BBE}\u{7F6E}",
     )
     .separator()
@@ -748,6 +755,7 @@ fn handle_status_center_menu_event<R: tauri::Runtime>(
 
   match id {
     TRAY_MENU_SHOW_STATUS_CENTER => reveal_status_center_window(app),
+    TRAY_MENU_OPEN_SETTINGS => request_open_settings(app, "tray"),
     MENU_REFRESH_DATA => emit_status_center_action(app, "refresh-data", None),
     MENU_ALWAYS_FLOAT => {
       state.preferences.always_float = !state.preferences.always_float;
@@ -796,9 +804,16 @@ fn handle_status_center_menu_event<R: tauri::Runtime>(
 
 fn reveal_status_center_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
   if let Some(window) = app.get_webview_window(STATUS_WINDOW_LABEL) {
-    let _ = window.show();
     let _ = window.unminimize();
+    let _ = window.show();
+    let _ = correct_status_window_position_for_window(&window);
     let _ = window.set_focus();
+  }
+}
+
+fn hide_status_center_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+  if let Some(window) = app.get_webview_window(STATUS_WINDOW_LABEL) {
+    let _ = window.hide();
   }
 }
 
@@ -865,6 +880,16 @@ pub fn run() {
       if let Ok(mut state) = setup_state.lock() {
         state.preferences = preferences.clone();
         state.menu_items = Some(menu_items);
+      }
+
+      if let Some(window) = app.get_webview_window(STATUS_WINDOW_LABEL) {
+        let app_handle = app.handle().clone();
+        window.on_window_event(move |event| {
+          if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            hide_status_center_window(&app_handle);
+          }
+        });
       }
 
       emit_status_center_settings(app.handle(), &preferences);

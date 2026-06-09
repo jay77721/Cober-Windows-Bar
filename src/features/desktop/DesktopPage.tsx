@@ -15,6 +15,7 @@ import {
   listenStatusCenterSettings,
   type StatusCenterMenuAction,
 } from "../../runtime/desktopProductRuntime";
+import { loadDesktopStatusEvents } from "../../runtime/desktopStatusInputRuntime";
 import {
   captureStatusWindowDragState,
   correctStatusWindowPosition,
@@ -54,6 +55,7 @@ const STATUS_CENTER_CONTEXT_MENU_COMMAND = "show_status_center_context_menu";
 const STATUS_CENTER_SETTINGS_COMMAND = "get_status_center_settings";
 const OPEN_STATUS_CENTER_SETTINGS_COMMAND = "open_status_center_settings";
 const SET_STATUS_CENTER_PREFERENCES_COMMAND = "set_status_center_preferences";
+const SHOW_STATUS_CENTER_WINDOW_COMMAND = "show_status_center_window";
 
 const DEFAULT_PREFERENCES: DesktopStatusPreferences = {
   alwaysFloat: true,
@@ -70,7 +72,7 @@ export function DesktopPage() {
   const [metrics, setMetrics] = useState<SystemPerformanceMetric[]>(systemPerformanceMetrics);
   const [preferences, setPreferences] = useState<DesktopStatusPreferences>(DEFAULT_PREFERENCES);
   const [activeStatusKind, setActiveStatusKind] = useState<DesktopStatusKind | null>(null);
-  const [desktopEvents] = useState<HubEvent[]>(mockHubEvents);
+  const [desktopEvents, setDesktopEvents] = useState<HubEvent[]>(mockHubEvents);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const dragStateRef = useRef<StatusWindowDragState | null>(null);
   const dragPointerRef = useRef<DragPointer | null>(null);
@@ -181,7 +183,13 @@ export function DesktopPage() {
   }
 
   async function quitStatusCenter() {
-    await appWindowRef.current.close();
+    const invoke = getTauriInvoke();
+    if (!invoke) {
+      await appWindowRef.current.hide();
+      return;
+    }
+
+    await appWindowRef.current.hide();
   }
 
   function openSettings() {
@@ -246,6 +254,20 @@ export function DesktopPage() {
     return () => {
       mounted = false;
       window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void loadDesktopStatusEvents().then((result) => {
+      if (mounted) {
+        setDesktopEvents(result.events);
+      }
+    });
+
+    return () => {
+      mounted = false;
     };
   }, []);
 
@@ -490,6 +512,17 @@ export function DesktopPage() {
     await invoke(OPEN_STATUS_CENTER_SETTINGS_COMMAND);
   }
 
+  async function recallStatusCenter() {
+    const invoke = getTauriInvoke();
+    if (!invoke) {
+      await appWindowRef.current.show();
+      await appWindowRef.current.setFocus();
+      return;
+    }
+
+    await invoke(SHOW_STATUS_CENTER_WINDOW_COMMAND);
+  }
+
   return (
     <main
       className="product-status-window"
@@ -589,6 +622,13 @@ export function DesktopPage() {
                 onClick={() => void handleOpenSettingsClick()}
               >
                 触发原生设置入口
+              </button>
+              <button
+                type="button"
+                className="product-status-settings-action"
+                onClick={() => void recallStatusCenter()}
+              >
+                召回状态中心
               </button>
             </div>
           </div>
