@@ -367,7 +367,7 @@ fn set_status_center_preferences(
 
 #[tauri::command]
 fn show_status_center_window(app: tauri::AppHandle) -> Result<(), String> {
-  reveal_status_center_window(&app);
+  toggle_status_center_window(&app);
   Ok(())
 }
 
@@ -817,6 +817,20 @@ fn hide_status_center_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
   }
 }
 
+fn toggle_status_center_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+  if let Some(window) = app.get_webview_window(STATUS_WINDOW_LABEL) {
+    let is_visible = window.is_visible().unwrap_or(false);
+    let is_minimized = window.is_minimized().unwrap_or(false);
+
+    if is_visible && !is_minimized {
+      let _ = window.hide();
+      return;
+    }
+  }
+
+  reveal_status_center_window(app);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let desktop_product_state: SharedDesktopProductState<tauri::Wry> =
@@ -865,7 +879,7 @@ pub fn run() {
             ..
           } = event
           {
-            reveal_status_center_window(tray.app_handle());
+            toggle_status_center_window(tray.app_handle());
           }
         });
 

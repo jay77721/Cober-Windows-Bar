@@ -459,6 +459,7 @@ test("adapter keeps forwarding later provider events after one publish fails", (
   assert.doesNotThrow(() =>
     connectProviderToEventBus(provider, {
       getState: createHubEventBus().getState,
+      replaceHubEvents() {},
       clearHubEvents() {},
       clearExpiredEvents() {},
       subscribe() {

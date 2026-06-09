@@ -166,6 +166,42 @@ test("event bus stores initial event snapshots instead of caller references", ()
   assert.deepEqual(snapshotMetadata, { fixture: true });
 });
 
+test("event bus can replace the full event set with snapshots", () => {
+  const bus = createHubEventBus([event({ id: "initial", type: "ai" })]);
+  const replacementPayload = {
+    id: "replacement-task",
+    type: "download" as const,
+    title: "Replacement download",
+    subtitle: "24 / 100",
+    progress: 24,
+    accent: "green" as const,
+  };
+  const replacementEvents = [
+    event({
+      id: "replacement",
+      type: "download",
+      source: "download",
+      payload: replacementPayload,
+      progress: 24,
+    }),
+  ];
+
+  bus.replaceHubEvents(replacementEvents);
+  replacementPayload.title = "Mutated after replace";
+
+  const state = bus.getState(now);
+  const snapshotPayload = state.events[0]?.payload;
+
+  assert.deepEqual(state.events.map((item) => item.id), ["replacement"]);
+  assert.equal(state.mode, "download");
+
+  if (!snapshotPayload || !("title" in snapshotPayload)) {
+    throw new Error("expected replacement payload snapshot");
+  }
+
+  assert.equal(snapshotPayload.title, "Replacement download");
+});
+
 test("event bus cleanup removes expired events and notifies subscribers", () => {
   const bus = createHubEventBus([
     event({ id: "expired", type: "notification", expiresAt: now - 1 }),

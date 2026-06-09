@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { mockHubEvents } from "../data/mockHubData";
-import { loadDesktopStatusEvents } from "./desktopStatusInputRuntime";
+import { createHubEventBus, getActiveHubEvents } from "../state/hubState";
+import {
+  createDesktopStatusRuntime,
+  loadDesktopStatusEvents,
+} from "./desktopStatusInputRuntime";
 
 const fixtureEvents = [
   {
@@ -62,6 +66,64 @@ async function testFallsBackToMockWhenFixtureLoadFails() {
   assert.equal(result.diagnostic?.code, "invoke-failed");
 }
 
+async function testDesktopStatusRuntimeSeedsBusAndRefreshesFromFixtureSource() {
+  const runtime = createDesktopStatusRuntime({
+    invoke: async () => fixtureEvents,
+  });
+
+  const initialSnapshot = runtime.getSnapshot();
+  assert.equal(initialSnapshot.source, "mock");
+  assert.deepEqual(
+    initialSnapshot.state.events.map((event) => event.id),
+    getActiveHubEvents(mockHubEvents).map((event) => event.id),
+  );
+
+  const refreshedSnapshot = await runtime.refresh();
+  assert.equal(refreshedSnapshot.source, "tauri-fixture");
+  assert.deepEqual(
+    refreshedSnapshot.state.events.map((event) => event.id),
+    ["fixture-download"],
+  );
+
+  runtime.dispose();
+}
+
+async function testDesktopStatusRuntimeSubscribersReceiveBusUpdates() {
+  const bus = createHubEventBus();
+  const runtime = createDesktopStatusRuntime({
+    eventBus: bus,
+    fallbackEvents: fixtureEvents,
+  });
+  const observedEventIds: string[][] = [];
+  const unsubscribe = runtime.subscribe((snapshot) => {
+    observedEventIds.push(snapshot.state.events.map((event) => event.id));
+  });
+
+  bus.publishHubEvent({
+    id: "live-ai",
+    type: "ai",
+    source: "ai",
+    createdAt: 456,
+    progress: 61,
+    payload: {
+      id: "live-ai-task",
+      type: "ai",
+      title: "Live stream",
+      subtitle: "From bus",
+      progress: 61,
+      accent: "blue",
+    },
+  });
+
+  assert.deepEqual(observedEventIds[0], ["fixture-download"]);
+  assert.deepEqual(observedEventIds[observedEventIds.length - 1], ["live-ai", "fixture-download"]);
+
+  unsubscribe();
+  runtime.dispose();
+}
+
 await testFallsBackToMockWithoutInvoke();
 await testLoadsFixtureEventsFromTauriInvoke();
 await testFallsBackToMockWhenFixtureLoadFails();
+await testDesktopStatusRuntimeSeedsBusAndRefreshesFromFixtureSource();
+await testDesktopStatusRuntimeSubscribersReceiveBusUpdates();

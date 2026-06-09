@@ -102,6 +102,7 @@ export function createHubStoreState(events: HubEvent[], now = Date.now()): HubSt
 export type HubEventBus = {
   getState(now?: number): HubStoreState;
   publishHubEvent(event: HubEvent): void;
+  replaceHubEvents(events: HubEvent[]): void;
   clearHubEvents(): void;
   clearExpiredEvents(now?: number): void;
   subscribe(subscriber: (state: HubStoreState) => void): () => void;
@@ -132,6 +133,10 @@ export function createHubEventBus(initialEvents: HubEvent[] = []): HubEventBus {
     getState: snapshot,
     publishHubEvent(event: HubEvent) {
       events = [snapshotHubEvent(event), ...events.filter((item) => item.id !== event.id)];
+      notify();
+    },
+    replaceHubEvents(nextEvents: HubEvent[]) {
+      events = nextEvents.map(snapshotHubEvent);
       notify();
     },
     clearHubEvents() {

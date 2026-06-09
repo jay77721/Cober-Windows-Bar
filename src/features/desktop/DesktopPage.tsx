@@ -8,14 +8,17 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MonitorCog, X } from "lucide-react";
 import { DESKTOP_STATUS_TEMPLATE_DESCRIPTORS } from "../../data/desktopStatusConfig";
-import { mockHubEvents, systemPerformanceMetrics } from "../../data/mockHubData";
+import { systemPerformanceMetrics } from "../../data/mockHubData";
 import {
   listenStatusCenterMenuActions,
   listenStatusCenterOpenSettings,
   listenStatusCenterSettings,
   type StatusCenterMenuAction,
 } from "../../runtime/desktopProductRuntime";
-import { loadDesktopStatusEvents } from "../../runtime/desktopStatusInputRuntime";
+import {
+  getDesktopStatusRuntime,
+  type DesktopStatusRuntimeSnapshot,
+} from "../../runtime/desktopStatusInputRuntime";
 import {
   captureStatusWindowDragState,
   correctStatusWindowPosition,
@@ -39,7 +42,7 @@ import type {
   DesktopStatusKind,
   DesktopStatusPreferences,
   DesktopStatusPreferencesPayload,
-  HubEvent,
+  HubStoreState,
   SystemPerformanceMetric,
 } from "../../types/hub";
 import { ClipboardStatusTemplate } from "./templates/ClipboardStatusTemplate";
@@ -69,10 +72,12 @@ type DragPointer = {
 };
 
 export function DesktopPage() {
+  const desktopStatusRuntime = getDesktopStatusRuntime();
+  const initialDesktopStatusSnapshot = desktopStatusRuntime.getSnapshot();
   const [metrics, setMetrics] = useState<SystemPerformanceMetric[]>(systemPerformanceMetrics);
   const [preferences, setPreferences] = useState<DesktopStatusPreferences>(DEFAULT_PREFERENCES);
   const [activeStatusKind, setActiveStatusKind] = useState<DesktopStatusKind | null>(null);
-  const [desktopEvents, setDesktopEvents] = useState<HubEvent[]>(mockHubEvents);
+  const [desktopHubState, setDesktopHubState] = useState<HubStoreState>(initialDesktopStatusSnapshot.state);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const dragStateRef = useRef<StatusWindowDragState | null>(null);
   const dragPointerRef = useRef<DragPointer | null>(null);
@@ -82,9 +87,10 @@ export function DesktopPage() {
   const isDraggingRef = useRef(false);
   const overlayStateRef = useRef(createStatusWindowOverlayState());
   const appWindowRef = useRef(getCurrentWindow());
+  const desktopStatusRuntimeRef = useRef(desktopStatusRuntime);
 
   const aggregatedStatus = aggregateDesktopStatusInput({
-    events: desktopEvents,
+    hubState: desktopHubState,
     availableKinds: DESKTOP_STATUS_TEMPLATE_DESCRIPTORS.map((descriptor) => descriptor.kind),
   });
 
@@ -120,8 +126,12 @@ export function DesktopPage() {
       return;
     }
 
-    const nextMetrics = await loadSystemPerformance();
+    const [nextMetrics, nextDesktopStatusSnapshot] = await Promise.all([
+      loadSystemPerformance(),
+      desktopStatusRuntimeRef.current.refresh(),
+    ]);
     setMetrics(nextMetrics);
+    applyDesktopStatusSnapshot(nextDesktopStatusSnapshot, setDesktopHubState);
   }
 
   async function showNativeContextMenu(x: number, y: number) {
@@ -258,17 +268,16 @@ export function DesktopPage() {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    void loadDesktopStatusEvents().then((result) => {
-      if (mounted) {
-        setDesktopEvents(result.events);
-      }
+    const runtime = desktopStatusRuntimeRef.current;
+    const unsubscribe = runtime.subscribe((snapshot) => {
+      applyDesktopStatusSnapshot(snapshot, setDesktopHubState);
     });
 
-    return () => {
-      mounted = false;
-    };
+    void runtime.refresh().then((snapshot) => {
+      applyDesktopStatusSnapshot(snapshot, setDesktopHubState);
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -650,6 +659,13 @@ function isPreferencesPayload(value: unknown): value is DesktopStatusPreferences
     typeof preferences.avoidFullscreen === "boolean" &&
     typeof preferences.lockPosition === "boolean"
   );
+}
+
+function applyDesktopStatusSnapshot(
+  snapshot: DesktopStatusRuntimeSnapshot,
+  setDesktopHubState: (state: HubStoreState) => void,
+) {
+  setDesktopHubState(snapshot.state);
 }
 
 function renderDesktopStatusTemplate(state: ReturnType<typeof resolveDesktopStatusState>) {
