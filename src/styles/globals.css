@@ -152,7 +152,7 @@ button {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: 76px 76px 76px;
+    grid-template-columns: 72px 72px 72px;
     min-width: 0;
     align-items: center;
     justify-content: start;
@@ -161,8 +161,8 @@ button {
   .product-status-metric {
     display: grid;
     min-width: 0;
-    gap: 6px;
-    padding: 0 10px;
+    gap: 5px;
+    padding: 0 8px;
   }
 
   .product-status-metric:first-child {
@@ -177,7 +177,7 @@ button {
     display: flex;
     min-width: 0;
     align-items: baseline;
-    gap: 4px;
+    gap: 3px;
     line-height: 1;
   }
 
@@ -201,7 +201,7 @@ button {
 
   .product-status-track {
     display: block;
-    width: 52px;
+    width: 48px;
     height: 3px;
     overflow: hidden;
     border-radius: 999px;

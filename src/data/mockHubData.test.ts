@@ -70,6 +70,7 @@ const stateTemplates = createDesktopStatusStateTemplates(
 
 assert.equal(stateTemplates.resident.title, "\u7cfb\u7edf\u6027\u80fd");
 assert.equal(stateTemplates.resident.subtitle, "\u5e38\u9a7b\u72b6\u6001\u4e2d\u5fc3");
+assert.equal(labels.currentUsage, "\u5f53\u524d\u4f7f\u7528\u7387");
 assert.equal(stateTemplates.clipboard.title, "\u5df2\u590d\u5236\u5185\u5bb9");
 assert.equal(stateTemplates.clipboard.subtitle, "\u526a\u8d34\u677f\u66f4\u65b0");
 assert.equal(stateTemplates.focus.sessionLabel, "\u6df1\u5ea6\u5de5\u4f5c 25 \u5206\u949f");
