@@ -15,7 +15,7 @@ export function ResidentStatusTemplate({ state }: ResidentStatusTemplateProps) {
       <div className="product-status-metrics">
         {state.metrics.map((metric) => {
           const accent = metricAccent(metric);
-          const label = `${metric.label} 当前使用率 ${metric.value}%`;
+          const label = `${metric.label} 使用率 ${metric.value}%`;
 
           return (
             <div className="product-status-metric" key={metric.id} aria-label={label} title={label}>

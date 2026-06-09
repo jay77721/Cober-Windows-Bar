@@ -297,6 +297,26 @@ export function DesktopPage() {
   }, []);
 
   useEffect(() => {
+    function handleGlobalContextMenu(event: MouseEvent) {
+      event.preventDefault();
+      void showNativeContextMenu(event.clientX, event.clientY);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && settingsOpen) {
+        closeSettings();
+      }
+    }
+
+    document.addEventListener("contextmenu", handleGlobalContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("contextmenu", handleGlobalContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [settingsOpen]);
+
+  useEffect(() => {
     const runtime = desktopStatusRuntimeRef.current;
     const unsubscribe = runtime.subscribe((snapshot) => {
       applyDesktopStatusSnapshot(snapshot, setDesktopHubState);
@@ -565,7 +585,6 @@ export function DesktopPage() {
     <main
       className="product-status-window"
       data-testid="desktop-preview"
-      onContextMenu={handleContextMenu}
       onPointerDownCapture={handlePointerDown}
     >
       <section className="product-status-center" aria-label={shellCopy.ariaLabel}>
