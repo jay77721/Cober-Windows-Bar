@@ -8,8 +8,18 @@ type ResidentStatusTemplateProps = {
 export function ResidentStatusTemplate({ state }: ResidentStatusTemplateProps) {
   return (
     <>
-      <div className="product-status-icon" aria-hidden="true">
-        <Cpu size={36} strokeWidth={2.35} />
+      <div className="product-status-icon product-status-icon-resident" aria-hidden="true">
+        <Cpu size={20} strokeWidth={2.2} />
+      </div>
+
+      <div className="product-status-resident-copy">
+        <span className="product-status-resident-eyebrow">System</span>
+        <strong>{state.title}</strong>
+        <span>{state.subtitle}</span>
+        <span className="product-status-resident-live">
+          <span />
+          Live
+        </span>
       </div>
 
       <div className="product-status-metrics">
@@ -18,10 +28,15 @@ export function ResidentStatusTemplate({ state }: ResidentStatusTemplateProps) {
           const label = `${metric.label} 使用率 ${metric.value}%`;
 
           return (
-            <div className="product-status-metric" key={metric.id} aria-label={label} title={label}>
+            <div
+              className={`product-status-metric product-status-metric-${metric.tone}`}
+              key={metric.id}
+              aria-label={label}
+              title={label}
+            >
               <div className="product-status-label">
-                <strong>{metric.label}</strong>
-                <span>{metric.value}%</span>
+                <span className="product-status-label-name">{metric.label}</span>
+                <strong>{metric.value}%</strong>
               </div>
               <span
                 className="product-status-track"
@@ -47,31 +62,31 @@ export function ResidentStatusTemplate({ state }: ResidentStatusTemplateProps) {
 }
 
 function visibleMetricValue(value: number) {
-  return value <= 0 ? 8 : Math.max(value, 8);
+  return value <= 0 ? 10 : Math.max(value, 10);
 }
 
 function metricAccent(metric: SystemPerformanceMetric) {
   if (metric.value > 80) {
-    return "linear-gradient(90deg, #fb923c 0%, #ef4444 100%)";
+    return "linear-gradient(90deg, #f97316 0%, #ef4444 100%)";
   }
 
   if (metric.value >= 50) {
     switch (metric.tone) {
       case "blue":
-        return "linear-gradient(90deg, #2f8fed 0%, #60a5fa 100%)";
+        return "linear-gradient(90deg, #2f8fed 0%, #7dd3fc 100%)";
       case "violet":
-        return "linear-gradient(90deg, #7c6cff 0%, #a78bfa 100%)";
+        return "linear-gradient(90deg, #7c6cff 0%, #c084fc 100%)";
       case "cyan":
-        return "linear-gradient(90deg, #0fa7ad 0%, #2dd4bf 100%)";
+        return "linear-gradient(90deg, #0891b2 0%, #2dd4bf 100%)";
     }
   }
 
   switch (metric.tone) {
     case "blue":
-      return "linear-gradient(90deg, #1473f8 0%, #2f8fed 100%)";
+      return "linear-gradient(90deg, #0f6cbd 0%, #60a5fa 100%)";
     case "violet":
-      return "linear-gradient(90deg, #6d5dfc 0%, #8b7cff 100%)";
+      return "linear-gradient(90deg, #6d5dfc 0%, #a78bfa 100%)";
     case "cyan":
-      return "linear-gradient(90deg, #079aa2 0%, #0fa7ad 100%)";
+      return "linear-gradient(90deg, #0f766e 0%, #2dd4bf 100%)";
   }
 }
