@@ -6,6 +6,17 @@ import type {
 } from "../types/hub";
 
 export const DESKTOP_STATUS_FALLBACK_KIND: DesktopStatusKind = "resident";
+export const DESKTOP_STATUS_STABILITY_WINDOW_MS = 6_000;
+export const DESKTOP_STATUS_PREFERRED_WINDOW_MS = 20_000;
+export const DESKTOP_STATUS_PREEMPTION_WINDOW_MS = 12_000;
+
+function isWithinWindow(timestamp: number | undefined, now: number, durationMs: number): boolean {
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
+    return false;
+  }
+
+  return timestamp <= now && now - timestamp <= durationMs;
+}
 
 function dedupeKinds(kinds: DesktopStatusKind[] | undefined): DesktopStatusKind[] {
   if (!kinds?.length) {
@@ -28,24 +39,57 @@ export function getDesktopStatusPriorityOrder(): DesktopStatusKind[] {
 }
 
 export function scheduleDesktopStatus(input: DesktopStatusSchedulerInput): DesktopStatusScheduleDecision {
+  const now = typeof input.now === "number" && Number.isFinite(input.now) ? input.now : 0;
   const availableKinds = filterKnownKinds(dedupeKinds(input.availableKinds));
   const preferredKind = input.preferredKind;
+  const previousKind = input.previousKind;
+  const activeKinds = filterKnownKinds(dedupeKinds(input.activeKinds));
+  const activeAvailableKinds = activeKinds.filter((kind) => availableKinds.includes(kind));
+  const preferredStillPinned =
+    preferredKind &&
+    availableKinds.includes(preferredKind) &&
+    isWithinWindow(input.preferredUntil, now, DESKTOP_STATUS_PREFERRED_WINDOW_MS * 4);
 
-  if (preferredKind && availableKinds.includes(preferredKind)) {
+  if (preferredKind && availableKinds.includes(preferredKind) && preferredStillPinned) {
     return {
       kind: preferredKind,
       reason: "preferred",
+      changed: preferredKind !== previousKind,
     };
   }
 
-  const activeKinds = filterKnownKinds(dedupeKinds(input.activeKinds));
-  const activeAvailableKinds = activeKinds.filter((kind) => availableKinds.includes(kind));
+  const previousStillStable =
+    previousKind &&
+    activeAvailableKinds.includes(previousKind) &&
+    isWithinWindow(input.previousChangedAt, now, DESKTOP_STATUS_STABILITY_WINDOW_MS);
+
+  if (previousStillStable) {
+    const previousPriority = DESKTOP_STATUS_PRIORITY_ORDER.indexOf(previousKind);
+    const canPreemptPrevious = activeAvailableKinds.some((kind) => {
+      const priority = DESKTOP_STATUS_PRIORITY_ORDER.indexOf(kind);
+      const activatedAt = input.activatedAtByKind?.[kind];
+      return (
+        priority !== -1 &&
+        priority < previousPriority &&
+        isWithinWindow(activatedAt, now, DESKTOP_STATUS_PREEMPTION_WINDOW_MS)
+      );
+    });
+
+    if (!canPreemptPrevious) {
+      return {
+        kind: previousKind,
+        reason: "priority",
+        changed: false,
+      };
+    }
+  }
 
   for (const kind of DESKTOP_STATUS_PRIORITY_ORDER) {
     if (activeAvailableKinds.includes(kind)) {
       return {
         kind,
         reason: "priority",
+        changed: kind !== previousKind,
       };
     }
   }
@@ -54,6 +98,7 @@ export function scheduleDesktopStatus(input: DesktopStatusSchedulerInput): Deskt
     return {
       kind: DESKTOP_STATUS_FALLBACK_KIND,
       reason: "fallback",
+      changed: DESKTOP_STATUS_FALLBACK_KIND !== previousKind,
     };
   }
 
@@ -62,11 +107,13 @@ export function scheduleDesktopStatus(input: DesktopStatusSchedulerInput): Deskt
     return {
       kind: firstKnownAvailableKind,
       reason: "fallback",
+      changed: firstKnownAvailableKind !== previousKind,
     };
   }
 
   return {
     kind: DESKTOP_STATUS_FALLBACK_KIND,
     reason: "fallback",
+    changed: DESKTOP_STATUS_FALLBACK_KIND !== previousKind,
   };
 }

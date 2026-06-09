@@ -39,6 +39,7 @@ import { loadSystemPerformance } from "../../runtime/systemPerformanceRuntime";
 import { emitTauriFixtureEvents, getTauriInvoke } from "../../runtime/tauriRuntime";
 import { aggregateDesktopStatusInput } from "../../state/desktopStatusAggregation";
 import { resolveDesktopStatusState } from "../../state/desktopStatusState";
+import { DESKTOP_STATUS_PREFERRED_WINDOW_MS } from "../../state/desktopStatusScheduler";
 import type {
   DesktopStatusKind,
   DesktopStatusPreferences,
@@ -74,6 +75,7 @@ export function DesktopPage() {
   const [metrics, setMetrics] = useState<SystemPerformanceMetric[]>(systemPerformanceMetrics);
   const [preferences, setPreferences] = useState<DesktopStatusPreferences>(DEFAULT_PREFERENCES);
   const [activeStatusKind, setActiveStatusKind] = useState<DesktopStatusKind | null>(null);
+  const [preferredUntil, setPreferredUntil] = useState<number | undefined>(undefined);
   const [desktopHubState, setDesktopHubState] = useState<HubStoreState>(initialDesktopStatusSnapshot.state);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const shellCopy = getDesktopStatusShellCopy();
@@ -82,11 +84,27 @@ export function DesktopPage() {
   const overlayStateRef = useRef(createStatusWindowOverlayState());
   const appWindowRef = useRef(getCurrentWindow());
   const desktopStatusRuntimeRef = useRef(desktopStatusRuntime);
+  const previousResolvedKindRef = useRef<DesktopStatusKind | undefined>(undefined);
+  const previousResolvedChangedAtRef = useRef<number | undefined>(undefined);
+  const activatedAtByKindRef = useRef<Partial<Record<DesktopStatusKind, number>>>({});
+  const now = Date.now();
 
   const aggregatedStatus = aggregateDesktopStatusInput({
     hubState: desktopHubState,
     availableKinds: DESKTOP_STATUS_TEMPLATE_DESCRIPTORS.map((descriptor) => descriptor.kind),
   });
+
+  for (const kind of aggregatedStatus.activeKinds) {
+    if (activatedAtByKindRef.current[kind] === undefined) {
+      activatedAtByKindRef.current[kind] = now;
+    }
+  }
+
+  for (const kind of Object.keys(activatedAtByKindRef.current) as DesktopStatusKind[]) {
+    if (!aggregatedStatus.activeKinds.includes(kind)) {
+      delete activatedAtByKindRef.current[kind];
+    }
+  }
 
   const resolvedState = resolveDesktopStatusState({
     metrics,
@@ -94,7 +112,17 @@ export function DesktopPage() {
     availableKinds: aggregatedStatus.availableKinds,
     states: aggregatedStatus.states,
     preferredKind: activeStatusKind ?? undefined,
+    preferredUntil,
+    previousKind: previousResolvedKindRef.current,
+    previousChangedAt: previousResolvedChangedAtRef.current,
+    activatedAtByKind: activatedAtByKindRef.current,
+    now,
   });
+
+  if (previousResolvedKindRef.current !== resolvedState.kind) {
+    previousResolvedKindRef.current = resolvedState.kind;
+    previousResolvedChangedAtRef.current = now;
+  }
 
   async function handlePointerDown(event: ReactPointerEvent<HTMLElement>) {
     if (preferences.lockPosition || event.button !== 0) {
@@ -296,6 +324,25 @@ export function DesktopPage() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [settingsOpen]);
+
+  useEffect(() => {
+    if (preferredUntil === undefined) {
+      return;
+    }
+
+    if (preferredUntil <= Date.now()) {
+      setPreferredUntil(undefined);
+      setActiveStatusKind(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setPreferredUntil(undefined);
+      setActiveStatusKind(null);
+    }, Math.max(0, preferredUntil - Date.now()));
+
+    return () => window.clearTimeout(timer);
+  }, [preferredUntil]);
 
   useEffect(() => {
     const runtime = desktopStatusRuntimeRef.current;
@@ -579,7 +626,10 @@ export function DesktopPage() {
                       key={descriptor.kind}
                       type="button"
                       className={active ? "product-status-kind is-active" : "product-status-kind"}
-                      onClick={() => setActiveStatusKind(descriptor.kind)}
+                      onClick={() => {
+                        setActiveStatusKind(descriptor.kind);
+                        setPreferredUntil(Date.now() + DESKTOP_STATUS_PREFERRED_WINDOW_MS);
+                      }}
                     >
                       <strong>{descriptor.label}</strong>
                       <span>{descriptor.description}</span>

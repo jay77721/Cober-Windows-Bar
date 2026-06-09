@@ -21,7 +21,8 @@ test("desktop status resolver defaults to resident state", () => {
 });
 
 test("desktop status resolver can switch to another explicit state kind", () => {
-  const state = resolveDesktopStatusState({ metrics, preferredKind: "media" });
+  const now = 48_000;
+  const state = resolveDesktopStatusState({ metrics, preferredKind: "media", preferredUntil: now, now });
 
   assert.equal(state.kind, "media");
   assert.equal(state.title, "Neon Focus");
@@ -68,4 +69,22 @@ test("desktop status state listing exposes all six status templates in product o
     listDesktopStatusStates(metrics).map((state) => state.kind),
     ["resident", "media", "download", "update", "clipboard", "focus"],
   );
+});
+
+test("desktop status resolver keeps the previous state during the stability window", () => {
+  const now = 96_000;
+  const state = resolveDesktopStatusState({
+    metrics,
+    now,
+    previousKind: "media",
+    previousChangedAt: now - 1_000,
+    activeKinds: ["media", "clipboard"],
+    availableKinds: ["resident", "media", "clipboard"],
+    activatedAtByKind: {
+      media: now - 3_000,
+      clipboard: now - 400,
+    },
+  });
+
+  assert.equal(state.kind, "media");
 });

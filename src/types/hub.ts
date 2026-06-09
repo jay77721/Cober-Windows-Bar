@@ -119,6 +119,11 @@ export type DesktopStatusResolverInput = {
   activeKinds?: DesktopStatusKind[];
   availableKinds?: DesktopStatusKind[];
   states?: Partial<DesktopStatusStateMap>;
+  now?: number;
+  previousKind?: DesktopStatusKind;
+  previousChangedAt?: number;
+  preferredUntil?: number;
+  activatedAtByKind?: Partial<Record<DesktopStatusKind, number>>;
 };
 
 export type DesktopStatusSchedulerInput = Pick<
@@ -126,11 +131,17 @@ export type DesktopStatusSchedulerInput = Pick<
   "preferredKind" | "activeKinds"
 > & {
   availableKinds?: DesktopStatusKind[];
+  now?: number;
+  previousKind?: DesktopStatusKind;
+  previousChangedAt?: number;
+  preferredUntil?: number;
+  activatedAtByKind?: Partial<Record<DesktopStatusKind, number>>;
 };
 
 export type DesktopStatusScheduleDecision = {
   kind: DesktopStatusKind;
   reason: "preferred" | "priority" | "fallback";
+  changed: boolean;
 };
 
 export type DesktopStatusAggregationInput = {

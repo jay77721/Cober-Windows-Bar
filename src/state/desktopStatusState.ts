@@ -50,6 +50,13 @@ export function resolveDesktopStatusState(input: DesktopStatusResolverInput): De
     preferredKind: input.preferredKind,
     activeKinds: input.activeKinds,
     availableKinds,
+    now: (input as DesktopStatusResolverInput & { now?: number }).now,
+    previousKind: (input as DesktopStatusResolverInput & { previousKind?: DesktopStatusKind }).previousKind,
+    previousChangedAt: (input as DesktopStatusResolverInput & { previousChangedAt?: number }).previousChangedAt,
+    preferredUntil: (input as DesktopStatusResolverInput & { preferredUntil?: number }).preferredUntil,
+    activatedAtByKind: (input as DesktopStatusResolverInput & {
+      activatedAtByKind?: Partial<Record<DesktopStatusKind, number>>;
+    }).activatedAtByKind,
   });
 
   return states[decision.kind] ?? states[DESKTOP_STATUS_DEFAULT_KIND];
