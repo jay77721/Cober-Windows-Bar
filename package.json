@@ -12,12 +12,13 @@
     "qa:showcase:interactions": "node scripts/qa-showcase-interactions.mjs",
     "test:state": "tsx src/state/hubState.test.ts",
     "test:providers": "tsx src/providers/provider.test.ts",
-    "test:runtime": "tsx src/runtime/tauriRuntime.test.ts",
+    "test:runtime": "tsx src/runtime/tauriRuntime.test.ts && tsx src/runtime/statusWindowRuntime.test.ts && tsx src/runtime/systemPerformanceRuntime.test.ts && tsx src/runtime/desktopProductRuntime.test.ts && tsx src/data/mockHubData.test.ts",
     "preview": "vite preview",
-    "desktop:mock": "tauri dev",
+    "desktop:mock": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/desktop-mock.ps1",
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
     "@vitejs/plugin-react": "^5.0.0",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.468.0",

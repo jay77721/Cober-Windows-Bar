@@ -1,5 +1,5 @@
-import type { NotificationState } from "../../types/hub";
-import { StatusIcon } from "../ui/StatusIcon";
+import type { NotificationState } from "../../../types/hub";
+import { StatusIcon } from "../../../shared/ui/StatusIcon";
 
 type NotificationHubProps = {
   notification: NotificationState;

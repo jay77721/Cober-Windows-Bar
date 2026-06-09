@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { DesktopPage } from "./pages/DesktopPage";
-import { ShowcasePage } from "./pages/ShowcasePage";
+import { DesktopPage } from "./features/desktop/DesktopPage";
+import { ShowcasePage } from "./features/showcase/ShowcasePage";
 
 export default function App() {
   const [path, setPath] = useState(() => window.location.pathname);

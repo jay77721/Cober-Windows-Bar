@@ -1,3 +1,4 @@
+import { invoke as invokeCommand, isTauri } from "@tauri-apps/api/core";
 import type { HubEvent, HubEventSource, HubEventType } from "../types/hub";
 
 export const TAURI_FIXTURE_COMMAND = "get_hub_event_fixtures";
@@ -33,8 +34,8 @@ export type TauriRuntimeCapabilities = {
   runtime: "tauri";
   fixtureIpc: true;
   tray: false;
-  alwaysOnTop: false;
-  windowsProviders: false;
+  alwaysOnTop: boolean;
+  windowsProviders: boolean;
   configuredShellWindow: TauriConfiguredShellWindow;
 };
 
@@ -64,12 +65,16 @@ export type HubEventPublisher = {
 };
 
 type TauriGlobal = {
+  __TAURI_INTERNALS__?: {
+    invoke?: unknown;
+  };
   __TAURI__?: {
     core?: {
       invoke?: TauriInvoke;
     };
     invoke?: TauriInvoke;
   };
+  isTauri?: boolean;
 };
 
 const eventTypes = new Set<HubEventType>(["music", "ai", "download", "notification"]);
@@ -94,7 +99,18 @@ export function getTauriInvoke(globalScope: unknown = globalThis): TauriInvoke |
   const tauri = (globalScope as TauriGlobal | undefined)?.__TAURI__;
   const invoke = tauri?.core?.invoke ?? tauri?.invoke;
 
-  return typeof invoke === "function" ? invoke : undefined;
+  if (typeof invoke === "function") {
+    return invoke;
+  }
+
+  const scope = globalScope as TauriGlobal | undefined;
+  const hasTauriInternals = typeof scope?.__TAURI_INTERNALS__?.invoke === "function";
+
+  if (scope?.isTauri === true || hasTauriInternals || isTauri()) {
+    return (command, args) => invokeCommand(command, args);
+  }
+
+  return undefined;
 }
 
 export async function loadTauriFixtureHubEvents({
@@ -243,8 +259,8 @@ function parseRuntimeCapabilities(value: unknown): TauriRuntimeCapabilities | un
     value.runtime !== "tauri" ||
     value.fixtureIpc !== true ||
     value.tray !== false ||
-    value.alwaysOnTop !== false ||
-    value.windowsProviders !== false ||
+    typeof value.alwaysOnTop !== "boolean" ||
+    typeof value.windowsProviders !== "boolean" ||
     !isConfiguredShellWindow(value.configuredShellWindow)
   ) {
     return undefined;

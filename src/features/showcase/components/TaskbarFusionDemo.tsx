@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { BatteryMedium, Bot, CloudSun, Download, Folder, Music2, PanelTop, Search, Wifi, Volume2 } from "lucide-react";
-import { ProgressBar } from "../ui/ProgressBar";
+import { ProgressBar } from "../../../shared/ui/ProgressBar";
 
 export function TaskbarFusionDemo() {
   return (

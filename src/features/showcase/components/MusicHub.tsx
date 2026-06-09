@@ -1,6 +1,6 @@
 import { Pause, SkipBack, SkipForward } from "lucide-react";
-import type { MusicState } from "../../types/hub";
-import { ProgressBar } from "../ui/ProgressBar";
+import type { MusicState } from "../../../types/hub";
+import { ProgressBar } from "../../../shared/ui/ProgressBar";
 
 type MusicHubProps = {
   music: MusicState;

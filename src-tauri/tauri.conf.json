@@ -13,13 +13,18 @@
     "windows": [
       {
         "title": "Cober Windows Bar",
-        "width": 960,
-        "height": 640,
-        "minWidth": 720,
-        "minHeight": 520,
+        "width": 350,
+        "height": 70,
+        "minWidth": 350,
+        "minHeight": 70,
         "center": true,
-        "resizable": true,
-        "fullscreen": false
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": true,
+        "shadow": false
       }
     ],
     "security": {

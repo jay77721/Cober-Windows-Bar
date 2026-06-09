@@ -12,6 +12,54 @@ export type HubEventType = HubTaskType;
 
 export type HubEventSource = "mock" | "system" | "music" | "download" | "ai" | "notification";
 
+export type SystemPerformanceMetricId = "cpu" | "memory" | "network";
+
+export type SystemPerformanceMetricTone = "blue" | "violet" | "cyan";
+
+export type SystemPerformanceMetric = {
+  id: SystemPerformanceMetricId;
+  label: string;
+  value: number;
+  tone: SystemPerformanceMetricTone;
+};
+
+export type SystemPerformanceSnapshot = {
+  cpu: number;
+  memory: number;
+  network: number;
+};
+
+export type DesktopStatusPreferenceKey = "alwaysFloat" | "avoidFullscreen" | "lockPosition";
+
+export type DesktopStatusPreferences = Record<DesktopStatusPreferenceKey, boolean>;
+
+export type DesktopStatusLabels = {
+  metrics: Record<SystemPerformanceMetricId, string>;
+  currentUsage: string;
+  menu: {
+    refreshData: string;
+    alwaysFloat: string;
+    avoidFullscreen: string;
+    lockPosition: string;
+    resetPosition: string;
+    openSettings: string;
+    quit: string;
+  };
+};
+
+export type DesktopStatusMenuAction = {
+  id: string;
+  label: string;
+  kind: "action" | "toggle";
+  preferenceKey?: DesktopStatusPreferenceKey;
+};
+
+export type DesktopStatusConfig = {
+  preferences: DesktopStatusPreferences;
+  labels: DesktopStatusLabels;
+  menuActions: DesktopStatusMenuAction[];
+};
+
 export type HubTask = {
   id: string;
   type: HubTaskType;

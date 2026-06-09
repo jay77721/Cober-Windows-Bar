@@ -1,27 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HubShell } from "../components/hub/HubShell";
-import { EventPlaygroundPanel } from "../components/showcase/EventPlaygroundPanel";
-import { FluentStyleGuide } from "../components/showcase/FluentStyleGuide";
-import { ModeSidebar } from "../components/showcase/ModeSidebar";
-import { StatusFlow } from "../components/showcase/StatusFlow";
-import { TaskbarFusionDemo } from "../components/showcase/TaskbarFusionDemo";
+import { HubShell } from "./components/HubShell";
+import { EventPlaygroundPanel } from "./components/EventPlaygroundPanel";
+import { FluentStyleGuide } from "./components/FluentStyleGuide";
+import { ModeSidebar } from "./components/ModeSidebar";
+import { StatusFlow } from "./components/StatusFlow";
+import { TaskbarFusionDemo } from "./components/TaskbarFusionDemo";
 import {
   createAutoDemoSequence,
   createHubDemoScenario,
   playHubDemoScenario,
   type HubDemoScenarioId,
-} from "../state/hubScenarios";
-import { createHubEventBus } from "../state/hubState";
+} from "../../state/hubScenarios";
+import { createHubEventBus } from "../../state/hubState";
 import {
   createMockAiTaskProvider,
   createMockDownloadProvider,
   createMockMusicProvider,
   createMockNotificationProvider,
-} from "../providers/mockProviders";
-import { connectProviderToEventBus, type ProviderConnection } from "../providers/providerAdapter";
-import type { HubProvider } from "../providers/types";
-import { publishTauriFixtureEvents } from "../runtime/tauriRuntime";
-import type { HubMode, HubStoreState } from "../types/hub";
+} from "../../providers/mockProviders";
+import { connectProviderToEventBus, type ProviderConnection } from "../../providers/providerAdapter";
+import type { HubProvider } from "../../providers/types";
+import { publishTauriFixtureEvents } from "../../runtime/tauriRuntime";
+import type { HubMode, HubStoreState } from "../../types/hub";
 
 type ProviderDemoId = "music" | "ai" | "download" | "notification";
 

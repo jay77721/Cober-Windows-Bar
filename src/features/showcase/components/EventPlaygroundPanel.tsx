@@ -1,4 +1,4 @@
-import type { HubEvent, HubMode } from "../../types/hub";
+import type { HubEvent, HubMode } from "../../../types/hub";
 import {
   Bell,
   Bot,

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Bot, Download, Folder, Music2, PanelTop, Search } from "lucide-react";
-import { ProgressBar } from "../ui/ProgressBar";
+import { ProgressBar } from "../../../shared/ui/ProgressBar";
 
 export function FluentStyleGuide() {
   return (

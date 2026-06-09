@@ -40,7 +40,11 @@ async function ensureServer() {
     return false;
   }
 
-  const command = process.env.npm_execpath ? process.execPath : process.platform === "win32" ? "npm.cmd" : "npm";
+  const command = process.env.npm_execpath
+    ? process.execPath
+    : process.platform === "win32"
+      ? "npm.cmd"
+      : "npm";
   const args = [
     ...(process.env.npm_execpath ? [process.env.npm_execpath] : []),
     "run",
@@ -81,9 +85,13 @@ async function stopServer() {
 
   if (process.platform === "win32") {
     await new Promise((resolve) => {
-      const taskkill = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
-        stdio: "ignore",
-      });
+      const taskkill = spawn(
+        "taskkill",
+        ["/PID", String(child.pid), "/T", "/F"],
+        {
+          stdio: "ignore",
+        },
+      );
       taskkill.on("close", resolve);
       taskkill.on("error", resolve);
     });
@@ -98,30 +106,51 @@ async function clickButton(locator, name) {
 }
 
 async function expectText(locator, text, timeout = 5_000) {
-  await locator.getByText(text, { exact: true }).waitFor({ state: "visible", timeout });
+  await locator
+    .getByText(text, { exact: true })
+    .waitFor({ state: "visible", timeout });
 }
 
 async function expectProgressBar(locator, name, timeout = 5_000) {
-  await locator.getByRole("progressbar", { name, exact: true }).waitFor({ state: "visible", timeout });
+  await locator
+    .getByRole("progressbar", { name, exact: true })
+    .waitFor({ state: "visible", timeout });
 }
 
 async function expectButton(locator, name, timeout = 5_000) {
-  await locator.getByRole("button", { name, exact: true }).waitFor({ state: "visible", timeout });
+  await locator
+    .getByRole("button", { name, exact: true })
+    .waitFor({ state: "visible", timeout });
 }
 
 async function expectLink(locator, name, timeout = 5_000) {
-  await locator.getByRole("link", { name, exact: true }).waitFor({ state: "visible", timeout });
+  await locator
+    .getByRole("link", { name, exact: true })
+    .waitFor({ state: "visible", timeout });
+}
+
+async function expectHeading(locator, name, timeout = 5_000) {
+  await locator
+    .getByRole("heading", { name })
+    .waitFor({ state: "visible", timeout });
 }
 
 async function expectNoText(locator, text, timeout = 5_000) {
-  await locator.getByText(text, { exact: true }).waitFor({ state: "detached", timeout });
+  await locator
+    .getByText(text, { exact: true })
+    .waitFor({ state: "detached", timeout });
 }
 
 async function captureFailureScreenshot(page) {
   try {
-    await page.screenshot({ path: `${outputDir}/showcase-interactions-failure.png`, fullPage: true });
+    await page.screenshot({
+      path: `${outputDir}/showcase-interactions-failure.png`,
+      fullPage: true,
+    });
   } catch (error) {
-    console.warn(`Could not capture failure screenshot: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `Could not capture failure screenshot: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -129,7 +158,9 @@ async function closeBrowser(browser) {
   try {
     await browser.close();
   } catch (error) {
-    console.warn(`Could not close Playwright browser: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `Could not close Playwright browser: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -137,7 +168,9 @@ async function run() {
   await mkdir(outputDir, { recursive: true });
   const startedServer = await ensureServer();
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1700, height: 900 } });
+  const page = await browser.newPage({
+    viewport: { width: 1700, height: 900 },
+  });
 
   await page.addInitScript(() => {
     window.__qaTauriInvokeDelayMs = 0;
@@ -149,7 +182,9 @@ async function run() {
           }
 
           if (window.__qaTauriInvokeDelayMs > 0) {
-            await new Promise((resolve) => setTimeout(resolve, window.__qaTauriInvokeDelayMs));
+            await new Promise((resolve) =>
+              setTimeout(resolve, window.__qaTauriInvokeDelayMs),
+            );
           }
 
           return [
@@ -186,13 +221,17 @@ async function run() {
     const response = await page.goto(showcaseUrl, { waitUntil: "networkidle" });
 
     if (!response || response.status() !== 200) {
-      throw new Error(`/showcase returned ${response?.status() ?? "no response"}`);
+      throw new Error(
+        `/showcase returned ${response?.status() ?? "no response"}`,
+      );
     }
 
     const panel = page
       .locator("div")
       .filter({ has: page.getByText("Provider Demo", { exact: true }) })
-      .filter({ has: page.getByRole("button", { name: "Stop provider", exact: true }) })
+      .filter({
+        has: page.getByRole("button", { name: "Stop provider", exact: true }),
+      })
       .first();
     const mainPreview = page.getByTestId("showcase-main-preview");
 
@@ -220,7 +259,10 @@ async function run() {
     await clickButton(panel, "AI");
     await expectText(panel, "Mock AI Provider");
     await expectText(mainPreview, "Codex is updating the provider SDK");
-    await expectProgressBar(mainPreview, "Codex is updating the provider SDK progress");
+    await expectProgressBar(
+      mainPreview,
+      "Codex is updating the provider SDK progress",
+    );
 
     await clickButton(panel, "Download");
     await expectText(panel, "Mock Download Provider");
@@ -260,14 +302,22 @@ async function run() {
 
     await page.waitForTimeout(500);
 
-    const staleFixtureCount = await page.getByText("QA Tauri Fixture", { exact: true }).count();
+    const staleFixtureCount = await page
+      .getByText("QA Tauri Fixture", { exact: true })
+      .count();
     if (staleFixtureCount > 0) {
-      throw new Error("Stale Tauri fixture request published after Clear to idle");
+      throw new Error(
+        "Stale Tauri fixture request published after Clear to idle",
+      );
     }
 
-    const stalePublishedLabelCount = await page.getByText("Tauri fixture published", { exact: true }).count();
+    const stalePublishedLabelCount = await page
+      .getByText("Tauri fixture published", { exact: true })
+      .count();
     if (stalePublishedLabelCount > 0) {
-      throw new Error("Stale Tauri fixture request updated the playground label after Clear to idle");
+      throw new Error(
+        "Stale Tauri fixture request updated the playground label after Clear to idle",
+      );
     }
 
     if (consoleErrors.length > 0 || pageErrors.length > 0) {
@@ -279,30 +329,47 @@ async function run() {
       );
     }
 
-    const missingResponse = await page.goto(`${baseUrl}/missing`, { waitUntil: "networkidle" });
+    const missingResponse = await page.goto(`${baseUrl}/missing`, {
+      waitUntil: "networkidle",
+    });
 
     if (!missingResponse || missingResponse.status() !== 200) {
-      throw new Error(`/missing returned ${missingResponse?.status() ?? "no response"}`);
+      throw new Error(
+        `/missing returned ${missingResponse?.status() ?? "no response"}`,
+      );
     }
 
     await expectText(page, "Cober page not found");
     await expectLink(page, "Open /desktop");
 
-    const desktopResponse = await page.goto(desktopUrl, { waitUntil: "networkidle" });
+    const desktopResponse = await page.goto(desktopUrl, {
+      waitUntil: "networkidle",
+    });
 
     if (!desktopResponse || desktopResponse.status() !== 200) {
-      throw new Error(`/desktop returned ${desktopResponse?.status() ?? "no response"}`);
+      throw new Error(
+        `/desktop returned ${desktopResponse?.status() ?? "no response"}`,
+      );
     }
 
-    await page.getByTestId("desktop-preview").waitFor({ state: "visible", timeout: 5_000 });
+    await page
+      .getByTestId("desktop-preview")
+      .waitFor({ state: "visible", timeout: 5_000 });
     await expectText(page, "Cober Windows Bar");
-    await expectText(page, "Desktop status center");
-    await expectText(page, "Mock sources");
-    await expectText(page, "Windows context mock");
-    await expectButton(page, "Music");
-    await expectText(page, "Search mock apps");
+    await expectText(page, "Status bar prototype with adaptive islands");
+    await expectHeading(page, /Default State/);
+    await expectHeading(page, /Single Task States/);
+    await expectHeading(page, /Multi Task Stack/);
+    await expectHeading(page, /Theme Modes/);
+    await expectHeading(page, /Interaction States/);
+    await page
+      .getByRole("button", { name: "Search", exact: true })
+      .first()
+      .waitFor({ state: "visible", timeout: 5_000 });
 
-    console.log(`Showcase interaction QA passed at ${showcaseUrl}${startedServer ? " (started Vite)" : ""}`);
+    console.log(
+      `Showcase interaction QA passed at ${showcaseUrl}${startedServer ? " (started Vite)" : ""}`,
+    );
   } catch (error) {
     await captureFailureScreenshot(page);
     throw error;

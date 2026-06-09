@@ -1,4 +1,4 @@
-import { StatusIcon } from "../ui/StatusIcon";
+import { StatusIcon } from "../../../shared/ui/StatusIcon";
 
 export function IdleHub() {
   return (

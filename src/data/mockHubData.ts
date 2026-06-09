@@ -1,4 +1,11 @@
-import type { HubEvent, HubTask, MusicState, NotificationState, ShowcaseStep } from "../types/hub";
+import { createSystemPerformanceMetricSnapshot } from "./desktopStatusConfig";
+import type { HubEvent, HubTask, MusicState, NotificationState, ShowcaseStep, SystemPerformanceMetric } from "../types/hub";
+
+export const systemPerformanceMetrics: SystemPerformanceMetric[] = createSystemPerformanceMetricSnapshot({
+  cpu: 23,
+  memory: 68,
+  network: 56,
+});
 
 export const musicState: MusicState = {
   title: "Starline OST",

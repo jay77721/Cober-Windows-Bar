@@ -1,6 +1,6 @@
-import type { HubTask } from "../../types/hub";
-import { ProgressBar } from "../ui/ProgressBar";
-import { StatusIcon } from "../ui/StatusIcon";
+import type { HubTask } from "../../../types/hub";
+import { ProgressBar } from "../../../shared/ui/ProgressBar";
+import { StatusIcon } from "../../../shared/ui/StatusIcon";
 
 type MultiTaskHubProps = {
   tasks: HubTask[];
