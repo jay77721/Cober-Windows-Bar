@@ -3,6 +3,7 @@ import type { DesktopStatusMenuActionId, DesktopStatusPreferencesPayload } from 
 
 export const STATUS_CENTER_MENU_ACTION_EVENT = "status-center://menu-action";
 export const STATUS_CENTER_SETTINGS_EVENT = "status-center://settings";
+export const STATUS_CENTER_OPEN_SETTINGS_EVENT = "status-center://open-settings";
 
 export type StatusCenterMenuAction =
   | "refresh-data"
@@ -19,6 +20,9 @@ export type StatusCenterMenuActionPayload = {
 };
 
 export type StatusCenterSettingsPayload = DesktopStatusPreferencesPayload;
+export type StatusCenterOpenSettingsPayload = {
+  source: "menu" | "tray" | "invoke";
+};
 
 export function parseStatusCenterMenuActionPayload(
   value: unknown,
@@ -64,6 +68,19 @@ export async function listenStatusCenterSettings(
   });
 }
 
+export async function listenStatusCenterOpenSettings(
+  handler: (payload: StatusCenterOpenSettingsPayload, event: Event<unknown>) => void | Promise<void>,
+): Promise<UnlistenFn> {
+  return listen(STATUS_CENTER_OPEN_SETTINGS_EVENT, async (event) => {
+    const payload = parseStatusCenterOpenSettingsPayload(event.payload);
+    if (!payload) {
+      return;
+    }
+
+    await handler(payload, event);
+  });
+}
+
 export function parseStatusCenterSettingsPayload(
   value: unknown,
 ): StatusCenterSettingsPayload | undefined {
@@ -74,6 +91,20 @@ export function parseStatusCenterSettingsPayload(
   return {
     preferences: { ...value.preferences },
   };
+}
+
+export function parseStatusCenterOpenSettingsPayload(
+  value: unknown,
+): StatusCenterOpenSettingsPayload | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (value.source !== "menu" && value.source !== "tray" && value.source !== "invoke") {
+    return undefined;
+  }
+
+  return { source: value.source };
 }
 
 function isStatusCenterMenuAction(value: unknown): value is StatusCenterMenuAction {

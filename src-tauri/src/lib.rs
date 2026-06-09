@@ -5,6 +5,8 @@ use sysinfo::{Networks, System};
 use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, PhysicalPosition, Position, WebviewWindow};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use tauri_plugin_global_shortcut::ShortcutState;
 
 #[cfg(windows)]
 use windows_sys::Win32::{
@@ -22,6 +24,7 @@ const STATUS_WINDOW_EDGE_MARGIN: i32 = 8;
 const STATUS_WINDOW_LABEL: &str = "main";
 const STATUS_CENTER_MENU_ACTION_EVENT: &str = "status-center://menu-action";
 const STATUS_CENTER_SETTINGS_EVENT: &str = "status-center://settings";
+const STATUS_CENTER_OPEN_SETTINGS_EVENT: &str = "status-center://open-settings";
 const TRAY_ID: &str = "status-center-tray";
 const MENU_REFRESH_DATA: &str = "refresh-data";
 const MENU_ALWAYS_FLOAT: &str = "always-float";
@@ -30,6 +33,8 @@ const MENU_LOCK_POSITION: &str = "lock-position";
 const MENU_RESET_POSITION: &str = "reset-position";
 const MENU_OPEN_SETTINGS: &str = "open-settings";
 const MENU_QUIT: &str = "quit";
+const TRAY_MENU_SHOW_STATUS_CENTER: &str = "tray-show-status-center";
+const GLOBAL_SHORTCUT_RECALL: &str = "Alt+Shift+Space";
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +58,12 @@ impl Default for DesktopStatusPreferences {
 #[serde(rename_all = "camelCase")]
 struct StatusCenterSettingsPayload {
   preferences: DesktopStatusPreferences,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StatusCenterOpenSettingsPayload {
+  source: &'static str,
 }
 
 #[derive(Clone, Serialize)]
@@ -321,6 +332,18 @@ fn get_status_center_settings(
   Ok(StatusCenterSettingsPayload { preferences })
 }
 
+#[tauri::command]
+fn show_status_center_window(app: tauri::AppHandle) -> Result<(), String> {
+  reveal_status_center_window(&app);
+  Ok(())
+}
+
+#[tauri::command]
+fn open_status_center_settings(app: tauri::AppHandle) -> Result<(), String> {
+  request_open_settings(&app, "invoke");
+  Ok(())
+}
+
 fn sample_network_percent() -> u8 {
   let mut networks = Networks::new_with_refreshed_list();
   std::thread::sleep(std::time::Duration::from_millis(750));
@@ -576,6 +599,21 @@ fn create_status_center_menu<R: tauri::Runtime>(
   })
 }
 
+fn create_tray_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
+  MenuBuilder::new(app)
+    .text(
+      TRAY_MENU_SHOW_STATUS_CENTER,
+      "\u{663E}\u{793A}\u{0020}/\u{0020}\u{53EC}\u{56DE}\u{72B6}\u{6001}\u{4E2D}\u{5FC3}",
+    )
+    .text(
+      MENU_OPEN_SETTINGS,
+      "\u{6253}\u{5F00}\u{8BBE}\u{7F6E}",
+    )
+    .separator()
+    .text(MENU_QUIT, "\u{9000}\u{51FA}")
+    .build()
+}
+
 fn emit_status_center_settings<R: tauri::Runtime>(
   app: &tauri::AppHandle<R>,
   preferences: &DesktopStatusPreferences,
@@ -586,6 +624,14 @@ fn emit_status_center_settings<R: tauri::Runtime>(
     StatusCenterSettingsPayload {
       preferences: preferences.clone(),
     },
+  );
+}
+
+fn emit_open_settings_requested<R: tauri::Runtime>(app: &tauri::AppHandle<R>, source: &'static str) {
+  let _ = app.emit_to(
+    STATUS_WINDOW_LABEL,
+    STATUS_CENTER_OPEN_SETTINGS_EVENT,
+    StatusCenterOpenSettingsPayload { source },
   );
 }
 
@@ -612,6 +658,12 @@ fn apply_preference_menu_state<R: tauri::Runtime>(
   let _ = menu_items.lock_position.set_checked(preferences.lock_position);
 }
 
+fn request_open_settings<R: tauri::Runtime>(app: &tauri::AppHandle<R>, source: &'static str) {
+  reveal_status_center_window(app);
+  emit_open_settings_requested(app, source);
+  emit_status_center_action(app, "open-settings", None);
+}
+
 fn handle_status_center_menu_event<R: tauri::Runtime>(
   app: &tauri::AppHandle<R>,
   state: &SharedDesktopProductState<R>,
@@ -622,6 +674,7 @@ fn handle_status_center_menu_event<R: tauri::Runtime>(
   };
 
   match id {
+    TRAY_MENU_SHOW_STATUS_CENTER => reveal_status_center_window(app),
     MENU_REFRESH_DATA => emit_status_center_action(app, "refresh-data", None),
     MENU_ALWAYS_FLOAT => {
       state.preferences.always_float = !state.preferences.always_float;
@@ -652,7 +705,7 @@ fn handle_status_center_menu_event<R: tauri::Runtime>(
       emit_status_center_action(app, "toggle-lock-position", Some(state.preferences.lock_position));
     }
     MENU_RESET_POSITION => emit_status_center_action(app, "reset-position", None),
-    MENU_OPEN_SETTINGS => emit_status_center_action(app, "open-settings", None),
+    MENU_OPEN_SETTINGS => request_open_settings(app, "menu"),
     MENU_QUIT => {
       emit_status_center_action(app, "quit", None);
       app.exit(0);
@@ -688,14 +741,29 @@ pub fn run() {
 
       app.handle().plugin(tauri_plugin_opener::init())?;
 
+      #[cfg(not(any(target_os = "android", target_os = "ios")))]
+      app.handle().plugin(
+        tauri_plugin_global_shortcut::Builder::new()
+          .with_shortcut(GLOBAL_SHORTCUT_RECALL)?
+          .with_handler(|app, shortcut, event| {
+            if event.state == ShortcutState::Pressed
+              && shortcut.to_string().eq_ignore_ascii_case(GLOBAL_SHORTCUT_RECALL)
+            {
+              reveal_status_center_window(app);
+            }
+          })
+          .build(),
+      )?;
+
       let preferences = setup_state
         .lock()
         .map(|state| state.preferences.clone())
         .unwrap_or_default();
       let menu_items = create_status_center_menu(app.handle(), &preferences)?;
+      let tray_menu = create_tray_menu(app.handle())?;
 
       let mut tray_builder = TrayIconBuilder::with_id(TRAY_ID)
-        .menu(&menu_items.menu)
+        .menu(&tray_menu)
         .show_menu_on_left_click(false)
         .tooltip("Cober Windows Bar")
         .on_tray_icon_event(|tray, event| {
@@ -740,7 +808,9 @@ pub fn run() {
       correct_status_window_position,
       start_window_drag,
       show_status_center_context_menu,
-      get_status_center_settings
+      get_status_center_settings,
+      show_status_center_window,
+      open_status_center_settings
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import {
   parseStatusCenterMenuActionPayload,
+  parseStatusCenterOpenSettingsPayload,
   parseStatusCenterSettingsPayload,
 } from "./desktopProductRuntime";
 
@@ -83,6 +84,17 @@ test("clones settings payloads before returning them", () => {
   const parsed = parseStatusCenterSettingsPayload(input);
   assert.notEqual(parsed, input);
   assert.notEqual(parsed?.preferences, input.preferences);
+});
+
+test("accepts canonical open-settings payloads", () => {
+  assert.deepEqual(parseStatusCenterOpenSettingsPayload({ source: "menu" }), { source: "menu" });
+  assert.deepEqual(parseStatusCenterOpenSettingsPayload({ source: "tray" }), { source: "tray" });
+  assert.deepEqual(parseStatusCenterOpenSettingsPayload({ source: "invoke" }), { source: "invoke" });
+});
+
+test("rejects malformed open-settings payloads", () => {
+  assert.equal(parseStatusCenterOpenSettingsPayload(null), undefined);
+  assert.equal(parseStatusCenterOpenSettingsPayload({ source: "bad" }), undefined);
 });
 
 test("rejects malformed status center settings payloads", () => {

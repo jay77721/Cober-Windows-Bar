@@ -6,20 +6,15 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Cpu } from "lucide-react";
+import { MonitorCog, X } from "lucide-react";
+import { DESKTOP_STATUS_TEMPLATE_DESCRIPTORS } from "../../data/desktopStatusConfig";
 import { systemPerformanceMetrics } from "../../data/mockHubData";
-import type {
-  DesktopStatusPreferences,
-  DesktopStatusPreferencesPayload,
-  SystemPerformanceMetric,
-} from "../../types/hub";
 import {
   listenStatusCenterMenuActions,
+  listenStatusCenterOpenSettings,
   listenStatusCenterSettings,
   type StatusCenterMenuAction,
 } from "../../runtime/desktopProductRuntime";
-import { loadSystemPerformance } from "../../runtime/systemPerformanceRuntime";
-import { getTauriInvoke } from "../../runtime/tauriRuntime";
 import {
   captureStatusWindowDragState,
   correctStatusWindowPosition,
@@ -35,18 +30,35 @@ import {
   STATUS_WINDOW_SCALE_CHANGE_DEBOUNCE_MS,
   type StatusWindowDragState,
 } from "../../runtime/statusWindowRuntime";
+import { loadSystemPerformance } from "../../runtime/systemPerformanceRuntime";
+import { getTauriInvoke } from "../../runtime/tauriRuntime";
+import { resolveDesktopStatusState } from "../../state/desktopStatusState";
+import type {
+  DesktopStatusKind,
+  DesktopStatusPreferences,
+  DesktopStatusPreferencesPayload,
+  SystemPerformanceMetric,
+} from "../../types/hub";
+import { ClipboardStatusTemplate } from "./templates/ClipboardStatusTemplate";
+import { DownloadStatusTemplate } from "./templates/DownloadStatusTemplate";
+import { FocusStatusTemplate } from "./templates/FocusStatusTemplate";
+import { MediaStatusTemplate } from "./templates/MediaStatusTemplate";
+import { ResidentStatusTemplate } from "./templates/ResidentStatusTemplate";
+import { UpdateStatusTemplate } from "./templates/UpdateStatusTemplate";
 
 const STATUS_REFRESH_MS = 1800;
 const OVERLAY_POLICY_MS = 700;
-const CURRENT_USAGE_LABEL = "\u5F53\u524D\u4F7F\u7528\u7387";
 const STATUS_CENTER_CONTEXT_MENU_COMMAND = "show_status_center_context_menu";
 const STATUS_CENTER_SETTINGS_COMMAND = "get_status_center_settings";
+const OPEN_STATUS_CENTER_SETTINGS_COMMAND = "open_status_center_settings";
 
 const DEFAULT_PREFERENCES: DesktopStatusPreferences = {
   alwaysFloat: true,
   avoidFullscreen: true,
   lockPosition: false,
 };
+
+const DEFAULT_STATUS_KIND: DesktopStatusKind = "resident";
 
 type DragPointer = {
   x: number;
@@ -56,6 +68,8 @@ type DragPointer = {
 export function DesktopPage() {
   const [metrics, setMetrics] = useState<SystemPerformanceMetric[]>(systemPerformanceMetrics);
   const [preferences, setPreferences] = useState<DesktopStatusPreferences>(DEFAULT_PREFERENCES);
+  const [activeStatusKind, setActiveStatusKind] = useState<DesktopStatusKind>(DEFAULT_STATUS_KIND);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const dragStateRef = useRef<StatusWindowDragState | null>(null);
   const dragPointerRef = useRef<DragPointer | null>(null);
   const dragFrameRef = useRef<number | null>(null);
@@ -64,6 +78,11 @@ export function DesktopPage() {
   const isDraggingRef = useRef(false);
   const overlayStateRef = useRef(createStatusWindowOverlayState());
   const appWindowRef = useRef(getCurrentWindow());
+
+  const resolvedState = resolveDesktopStatusState({
+    metrics,
+    preferredKind: activeStatusKind,
+  });
 
   function mergePreferences(nextPreferences: Partial<DesktopStatusPreferences>) {
     setPreferences((previous) => ({ ...previous, ...nextPreferences }));
@@ -145,6 +164,14 @@ export function DesktopPage() {
     await appWindowRef.current.close();
   }
 
+  function openSettings() {
+    setSettingsOpen(true);
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+  }
+
   async function handleMenuAction(action: StatusCenterMenuAction, checked?: boolean) {
     switch (action) {
       case "refresh-data":
@@ -169,9 +196,7 @@ export function DesktopPage() {
         await resetPosition();
         return;
       case "open-settings":
-        window.alert(
-          "\u8BBE\u7F6E\u9762\u677F\u5C06\u5728\u4E0B\u4E00\u6CE2\u7248\u672C\u63A5\u5165\u3002",
-        );
+        openSettings();
         return;
       case "quit":
         await quitStatusCenter();
@@ -299,6 +324,7 @@ export function DesktopPage() {
     let disposed = false;
     let offMenuActions: (() => void) | undefined;
     let offSettings: (() => void) | undefined;
+    let offOpenSettings: (() => void) | undefined;
 
     function applySettings(payload: DesktopStatusPreferencesPayload) {
       if (disposed) {
@@ -321,12 +347,17 @@ export function DesktopPage() {
       offSettings = await listenStatusCenterSettings((payload) => {
         applySettings(payload);
       });
+
+      offOpenSettings = await listenStatusCenterOpenSettings(() => {
+        openSettings();
+      });
     })();
 
     return () => {
       disposed = true;
       offMenuActions?.();
       offSettings?.();
+      offOpenSettings?.();
     };
   }, []);
 
@@ -429,6 +460,16 @@ export function DesktopPage() {
     await showNativeContextMenu(event.clientX, event.clientY);
   }
 
+  async function handleOpenSettingsClick() {
+    const invoke = getTauriInvoke();
+    if (!invoke) {
+      openSettings();
+      return;
+    }
+
+    await invoke(OPEN_STATUS_CENTER_SETTINGS_COMMAND);
+  }
+
   return (
     <main
       className="product-status-window"
@@ -437,41 +478,102 @@ export function DesktopPage() {
       onPointerDownCapture={handlePointerDown}
     >
       <section className="product-status-center" aria-label="Cober system performance status center">
-        <div className="product-status-icon" aria-hidden="true">
-          <Cpu size={36} strokeWidth={2.35} />
-        </div>
-
-        <div className="product-status-metrics">
-          {metrics.map((metric) => {
-            const accent = metricAccent(metric);
-            const label = `${metric.label} ${CURRENT_USAGE_LABEL} ${metric.value}%`;
-
-            return (
-              <div className="product-status-metric" key={metric.id} aria-label={label} title={label}>
-                <div className="product-status-label">
-                  <strong>{metric.label}</strong>
-                  <span>{metric.value}%</span>
-                </div>
-                <span
-                  className="product-status-track"
-                  role="progressbar"
-                  aria-label={label}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={metric.value}
-                >
-                  <span
-                    style={{
-                      width: `${visibleMetricValue(metric.value)}%`,
-                      background: accent,
-                    }}
-                  />
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        {renderDesktopStatusTemplate(resolvedState)}
       </section>
+
+      {settingsOpen ? (
+        <section className="product-status-settings" aria-label="状态中心设置">
+          <header className="product-status-settings-header">
+            <div className="product-status-settings-title">
+              <div className="product-status-settings-icon" aria-hidden="true">
+                <MonitorCog size={18} strokeWidth={2.1} />
+              </div>
+              <div>
+                <strong>状态中心设置</strong>
+                <span>桌面能力与状态模板入口</span>
+              </div>
+            </div>
+            <button
+              className="product-status-settings-close"
+              type="button"
+              aria-label="关闭设置"
+              onClick={closeSettings}
+            >
+              <X size={16} strokeWidth={2.2} />
+            </button>
+          </header>
+
+          <div className="product-status-settings-body">
+            <div className="product-status-settings-section">
+              <span className="product-status-settings-label">窗口行为</span>
+              <div className="product-status-settings-grid">
+                <button
+                  type="button"
+                  className={settingsToggleClassName(preferences.alwaysFloat)}
+                  onClick={() => void setAlwaysFloat(!preferences.alwaysFloat)}
+                >
+                  <strong>总是悬浮</strong>
+                  <span>{preferences.alwaysFloat ? "已开启" : "已关闭"}</span>
+                </button>
+                <button
+                  type="button"
+                  className={settingsToggleClassName(preferences.avoidFullscreen)}
+                  onClick={() => setAvoidFullscreen(!preferences.avoidFullscreen)}
+                >
+                  <strong>全屏时避让</strong>
+                  <span>{preferences.avoidFullscreen ? "已开启" : "已关闭"}</span>
+                </button>
+                <button
+                  type="button"
+                  className={settingsToggleClassName(preferences.lockPosition)}
+                  onClick={() => setLockPosition(!preferences.lockPosition)}
+                >
+                  <strong>锁定位置</strong>
+                  <span>{preferences.lockPosition ? "已开启" : "已关闭"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="product-status-settings-section">
+              <span className="product-status-settings-label">状态模板</span>
+              <div className="product-status-settings-kinds">
+                {DESKTOP_STATUS_TEMPLATE_DESCRIPTORS.map((descriptor) => {
+                  const active = descriptor.kind === activeStatusKind;
+
+                  return (
+                    <button
+                      key={descriptor.kind}
+                      type="button"
+                      className={active ? "product-status-kind is-active" : "product-status-kind"}
+                      onClick={() => setActiveStatusKind(descriptor.kind)}
+                    >
+                      <strong>{descriptor.label}</strong>
+                      <span>{descriptor.description}</span>
+                      <small>{descriptor.providerHint}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="product-status-settings-actions">
+              <button type="button" className="product-status-settings-action" onClick={() => void refresh()}>
+                刷新数据
+              </button>
+              <button type="button" className="product-status-settings-action" onClick={() => void resetPosition()}>
+                重置位置
+              </button>
+              <button
+                type="button"
+                className="product-status-settings-action is-primary"
+                onClick={() => void handleOpenSettingsClick()}
+              >
+                触发原生设置入口
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -490,32 +592,23 @@ function isPreferencesPayload(value: unknown): value is DesktopStatusPreferences
   );
 }
 
-function visibleMetricValue(value: number) {
-  return value <= 0 ? 8 : Math.max(value, 8);
+function renderDesktopStatusTemplate(state: ReturnType<typeof resolveDesktopStatusState>) {
+  switch (state.kind) {
+    case "resident":
+      return <ResidentStatusTemplate state={state} />;
+    case "media":
+      return <MediaStatusTemplate state={state} />;
+    case "download":
+      return <DownloadStatusTemplate state={state} />;
+    case "update":
+      return <UpdateStatusTemplate state={state} />;
+    case "clipboard":
+      return <ClipboardStatusTemplate state={state} />;
+    case "focus":
+      return <FocusStatusTemplate state={state} />;
+  }
 }
 
-function metricAccent(metric: SystemPerformanceMetric) {
-  if (metric.value > 80) {
-    return "linear-gradient(90deg, #fb923c 0%, #ef4444 100%)";
-  }
-
-  if (metric.value >= 50) {
-    switch (metric.tone) {
-      case "blue":
-        return "linear-gradient(90deg, #2f8fed 0%, #60a5fa 100%)";
-      case "violet":
-        return "linear-gradient(90deg, #7c6cff 0%, #a78bfa 100%)";
-      case "cyan":
-        return "linear-gradient(90deg, #0fa7ad 0%, #2dd4bf 100%)";
-    }
-  }
-
-  switch (metric.tone) {
-    case "blue":
-      return "linear-gradient(90deg, #1473f8 0%, #2f8fed 100%)";
-    case "violet":
-      return "linear-gradient(90deg, #6d5dfc 0%, #8b7cff 100%)";
-    case "cyan":
-      return "linear-gradient(90deg, #079aa2 0%, #0fa7ad 100%)";
-  }
+function settingsToggleClassName(active: boolean) {
+  return active ? "product-status-toggle is-active" : "product-status-toggle";
 }
