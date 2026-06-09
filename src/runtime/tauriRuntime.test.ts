@@ -1,9 +1,11 @@
 import { strict as assert } from "node:assert";
 import {
+  emitTauriFixtureEvents,
   getTauriInvoke,
   loadTauriRuntimeCapabilities,
   loadTauriFixtureHubEvents,
   publishTauriFixtureEvents,
+  TAURI_EMIT_FIXTURE_EVENTS_COMMAND,
   TAURI_FIXTURE_COMMAND,
   TAURI_RUNTIME_CAPABILITIES_COMMAND,
   type TauriRuntimeDiagnostic,
@@ -529,6 +531,61 @@ test("does not publish when fixture command fails", async () => {
   assert.equal(result.ok, false);
   assert.equal(result.diagnostic.code, "invoke-failed");
   assert.equal(publishedEvents.length, 0);
+});
+
+test("emits native fixture events through the explicit refresh boundary", async () => {
+  let invokedCommand: string | undefined;
+  const result = await emitTauriFixtureEvents({
+    invoke: async (command) => {
+      invokedCommand = command;
+      return 3;
+    },
+  });
+
+  assert.equal(invokedCommand, TAURI_EMIT_FIXTURE_EVENTS_COMMAND);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.emitted, 3);
+  }
+});
+
+test("reports unavailable diagnostic when explicit fixture emit invoke is absent", async () => {
+  const result = await emitTauriFixtureEvents();
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "unavailable");
+  assertDiagnosticContext(result.diagnostic, {
+    surface: "fixtureEvents",
+    command: TAURI_EMIT_FIXTURE_EVENTS_COMMAND,
+  });
+});
+
+test("reports malformed diagnostic when explicit fixture emit count is not numeric", async () => {
+  const result = await emitTauriFixtureEvents({
+    invoke: async () => "three",
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "malformed");
+  assertDiagnosticContext(result.diagnostic, {
+    surface: "fixtureEvents",
+    command: TAURI_EMIT_FIXTURE_EVENTS_COMMAND,
+  });
+});
+
+test("reports invoke-failed diagnostic when explicit fixture emit rejects", async () => {
+  const result = await emitTauriFixtureEvents({
+    invoke: async () => {
+      throw new Error("emit failed");
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "invoke-failed");
+  assertDiagnosticContext(result.diagnostic, {
+    surface: "fixtureEvents",
+    command: TAURI_EMIT_FIXTURE_EVENTS_COMMAND,
+  });
 });
 
 test("detects unavailable Tauri capability invoke", async () => {

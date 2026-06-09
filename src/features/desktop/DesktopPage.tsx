@@ -9,6 +9,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MonitorCog, X } from "lucide-react";
 import {
   DESKTOP_STATUS_TEMPLATE_DESCRIPTORS,
+  getDesktopStatusShellCopy,
   getDesktopStatusSettingsCopy,
 } from "../../data/desktopStatusConfig";
 import { systemPerformanceMetrics } from "../../data/mockHubData";
@@ -38,7 +39,7 @@ import {
   type StatusWindowDragState,
 } from "../../runtime/statusWindowRuntime";
 import { loadSystemPerformance } from "../../runtime/systemPerformanceRuntime";
-import { getTauriInvoke } from "../../runtime/tauriRuntime";
+import { emitTauriFixtureEvents, getTauriInvoke } from "../../runtime/tauriRuntime";
 import { aggregateDesktopStatusInput } from "../../state/desktopStatusAggregation";
 import { resolveDesktopStatusState } from "../../state/desktopStatusState";
 import type {
@@ -82,6 +83,7 @@ export function DesktopPage() {
   const [activeStatusKind, setActiveStatusKind] = useState<DesktopStatusKind | null>(null);
   const [desktopHubState, setDesktopHubState] = useState<HubStoreState>(initialDesktopStatusSnapshot.state);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const shellCopy = getDesktopStatusShellCopy();
   const settingsCopy = getDesktopStatusSettingsCopy();
   const dragStateRef = useRef<StatusWindowDragState | null>(null);
   const dragPointerRef = useRef<DragPointer | null>(null);
@@ -130,8 +132,13 @@ export function DesktopPage() {
       return;
     }
 
+    const invoke = getTauriInvoke();
+    if (invoke) {
+      await emitTauriFixtureEvents({ invoke });
+    }
+
     const [nextMetrics, nextDesktopStatusSnapshot] = await Promise.all([
-      loadSystemPerformance(),
+      loadSystemPerformance({ invoke }),
       desktopStatusRuntimeRef.current.refresh(),
     ]);
     setMetrics(nextMetrics);
@@ -543,7 +550,7 @@ export function DesktopPage() {
       onContextMenu={handleContextMenu}
       onPointerDownCapture={handlePointerDown}
     >
-      <section className="product-status-center" aria-label="Cober system performance status center">
+      <section className="product-status-center" aria-label={shellCopy.ariaLabel}>
         {renderDesktopStatusTemplate(resolvedState)}
       </section>
 

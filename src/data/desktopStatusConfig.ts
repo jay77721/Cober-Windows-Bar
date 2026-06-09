@@ -20,100 +20,141 @@ const COPY = {
   templateDescriptors: [
     {
       kind: "resident",
-      label: "\u5e38\u9a7b\u6001",
-      description: "\u9ed8\u8ba4\u5c55\u793a CPU\u3001\u5185\u5b58\u548c\u7f51\u7edc\u4e09\u9879\u6838\u5fc3\u6307\u6807\u3002",
+      label: "常驻态",
+      description: "默认展示 CPU、内存和网络三项核心指标。",
       providerHint: "system performance",
     },
     {
       kind: "media",
-      label: "\u5a92\u4f53\u6001",
-      description: "\u5c55\u793a\u6b63\u5728\u64ad\u653e\u7684\u5a92\u4f53\u4fe1\u606f\u4e0e\u8fdb\u5ea6\u3002",
+      label: "媒体态",
+      description: "展示正在播放的媒体信息与进度。",
       providerHint: "media session",
     },
     {
       kind: "download",
-      label: "\u4e0b\u8f7d\u6001",
-      description: "\u5c55\u793a\u4e0b\u8f7d\u4efb\u52a1\u548c\u4f20\u8f93\u8fdb\u5ea6\u3002",
+      label: "下载态",
+      description: "展示下载任务和传输进度。",
       providerHint: "download watcher",
     },
     {
       kind: "update",
-      label: "\u66f4\u65b0\u6001",
-      description: "\u5c55\u793a\u7cfb\u7edf\u6216\u5e94\u7528\u66f4\u65b0\u8fdb\u5ea6\u3002",
+      label: "更新态",
+      description: "展示系统或应用更新进度。",
       providerHint: "update service",
     },
     {
       kind: "clipboard",
-      label: "\u526a\u8d34\u677f\u6001",
-      description: "\u5c55\u793a\u6700\u8fd1\u590d\u5236\u5185\u5bb9\u4e0e\u6765\u6e90\u3002",
+      label: "剪贴板态",
+      description: "展示最近复制内容与来源。",
       providerHint: "clipboard watcher",
     },
     {
       kind: "focus",
-      label: "\u4e13\u6ce8\u6001",
-      description: "\u5c55\u793a\u4e13\u6ce8\u6a21\u5f0f\u6216\u8ba1\u65f6\u72b6\u6001\u3002",
+      label: "专注态",
+      description: "展示专注模式或计时状态。",
       providerHint: "focus assist",
     },
   ] satisfies DesktopStatusTemplateDescriptor[],
   labels: {
     metrics: {
       cpu: "CPU",
-      memory: "\u5185\u5b58",
-      network: "\u7f51\u7edc",
+      memory: "内存",
+      network: "网络",
     },
-    currentUsage: "\u5f53\u524d\u4f7f\u7528\u7387",
+    currentUsage: "当前使用率",
     menu: {
-      refreshData: "\u5237\u65b0\u6570\u636e",
-      alwaysFloat: "\u603b\u662f\u60ac\u6d6e",
-      avoidFullscreen: "\u5168\u5c4f\u65f6\u907f\u8ba9",
-      lockPosition: "\u9501\u5b9a\u4f4d\u7f6e",
-      resetPosition: "\u91cd\u7f6e\u4f4d\u7f6e",
-      openSettings: "\u6253\u5f00\u8bbe\u7f6e",
-      quit: "\u9000\u51fa",
+      refreshData: "刷新数据",
+      alwaysFloat: "总是悬浮",
+      avoidFullscreen: "全屏时避让",
+      lockPosition: "锁定位置",
+      resetPosition: "重置位置",
+      openSettings: "打开设置",
+      quit: "退出",
     },
   },
   residentState: {
-    title: "\u7cfb\u7edf\u6027\u80fd",
-    subtitle: "\u5e38\u9a7b\u72b6\u6001\u4e2d\u5fc3",
+    title: "系统性能",
+    subtitle: "常驻状态中心",
   },
   mediaState: {
     title: "Neon Focus",
-    subtitle: "\u6b63\u5728\u64ad\u653e",
+    subtitle: "正在播放",
     artist: "Cober Player",
     timeLabel: "01:42 / 03:28",
   },
   downloadState: {
     title: "Windows ISO",
-    subtitle: "\u4e0b\u8f7d\u4efb\u52a1",
+    subtitle: "下载任务",
     detail: "3.1 GB / 5.4 GB",
   },
   updateState: {
-    title: "\u7cfb\u7edf\u66f4\u65b0",
-    subtitle: "\u51c6\u5907\u91cd\u542f",
+    title: "系统更新",
+    subtitle: "准备重启",
     detail: "KB5039302",
   },
   clipboardState: {
-    title: "\u5df2\u590d\u5236\u5185\u5bb9",
-    subtitle: "\u526a\u8d34\u677f\u66f4\u65b0",
-    detail: "\u6765\u81ea\u6d4f\u89c8\u5668",
+    title: "已复制内容",
+    subtitle: "剪贴板更新",
+    detail: "来自浏览器",
     copiedText: "https://github.com/jay77721/Cober-Windows-Bar",
   },
   focusState: {
-    title: "\u4e13\u6ce8\u6a21\u5f0f",
-    subtitle: "\u5df2\u5f00\u542f",
-    sessionLabel: "\u6df1\u5ea6\u5de5\u4f5c 25 \u5206\u949f",
-    detail: "\u5269\u4f59 12 \u5206\u949f",
+    title: "专注模式",
+    subtitle: "已开启",
+    sessionLabel: "深度工作 25 分钟",
+    detail: "剩余 12 分钟",
   },
   templateChrome: {
-    residentEyebrow: "\u5e38\u9a7b\u6001",
-    mediaEyebrow: "\u5a92\u4f53\u6001",
-    downloadEyebrow: "\u4e0b\u8f7d\u6001",
-    updateEyebrow: "\u66f4\u65b0\u6001",
-    clipboardEyebrow: "\u526a\u8d34\u677f\u6001",
-    focusEyebrow: "\u4e13\u6ce8\u6001",
-    mediaProgress: "\u5a92\u4f53\u8fdb\u5ea6",
-    downloadProgress: "\u4e0b\u8f7d\u8fdb\u5ea6",
-    updateProgress: "\u66f4\u65b0\u8fdb\u5ea6",
+    residentEyebrow: "常驻态",
+    mediaEyebrow: "媒体态",
+    downloadEyebrow: "下载态",
+    updateEyebrow: "更新态",
+    clipboardEyebrow: "剪贴板态",
+    focusEyebrow: "专注态",
+    mediaProgress: "媒体进度",
+    downloadProgress: "下载进度",
+    updateProgress: "更新进度",
+  },
+  shell: {
+    ariaLabel: "Cober Windows 状态中心",
+  },
+  settings: {
+    panel: {
+      ariaLabel: "状态中心设置",
+      title: "状态中心设置",
+      description: "整理桌面悬浮状态的显示方式与模板入口。",
+      closeLabel: "关闭设置",
+    },
+    sections: {
+      windowBehavior: "窗口行为",
+      statusTemplates: "状态模板",
+    },
+    toggles: {
+      alwaysFloat: {
+        title: "始终悬浮",
+        description: "让状态中心保持在桌面前景。",
+        activeLabel: "当前已开启",
+        inactiveLabel: "当前已关闭",
+      },
+      avoidFullscreen: {
+        title: "全屏时避让",
+        description: "检测到全屏应用时自动避开覆盖。",
+        activeLabel: "当前已开启",
+        inactiveLabel: "当前已关闭",
+      },
+      lockPosition: {
+        title: "锁定位置",
+        description: "固定当前停靠位置，避免误拖动。",
+        activeLabel: "当前位置已锁定",
+        inactiveLabel: "可自由拖动",
+      },
+    },
+    actions: {
+      refresh: "刷新数据",
+      resetPosition: "重置位置",
+      openNativeSettings: "打开原生设置入口",
+      recallStatusCenter: "召回状态中心",
+    },
   },
 } as const;
 
@@ -260,43 +301,10 @@ export function getDesktopStatusTemplateChromeCopy() {
   return COPY.templateChrome;
 }
 
+export function getDesktopStatusShellCopy() {
+  return COPY.shell;
+}
+
 export function getDesktopStatusSettingsCopy() {
-  return {
-    panel: {
-      ariaLabel: "状态中心设置",
-      title: "状态中心设置",
-      description: "整理桌面悬浮状态的显示方式与模板入口。",
-      closeLabel: "关闭设置",
-    },
-    sections: {
-      windowBehavior: "窗口行为",
-      statusTemplates: "状态模板",
-    },
-    toggles: {
-      alwaysFloat: {
-        title: "始终悬浮",
-        description: "让状态中心保持在桌面前景。",
-        activeLabel: "当前已开启",
-        inactiveLabel: "当前已关闭",
-      },
-      avoidFullscreen: {
-        title: "全屏时避让",
-        description: "检测到全屏应用时自动避开覆盖。",
-        activeLabel: "当前已开启",
-        inactiveLabel: "当前已关闭",
-      },
-      lockPosition: {
-        title: "锁定位置",
-        description: "固定当前停靠位置，避免误拖动。",
-        activeLabel: "当前位置已锁定",
-        inactiveLabel: "可自由拖动",
-      },
-    },
-    actions: {
-      refresh: COPY.labels.menu.refreshData,
-      resetPosition: COPY.labels.menu.resetPosition,
-      openNativeSettings: "打开原生设置入口",
-      recallStatusCenter: "召回状态中心",
-    },
-  } as const;
+  return COPY.settings;
 }

@@ -3,6 +3,7 @@ import type { HubEvent, HubEventSource, HubEventType } from "../types/hub";
 
 export const TAURI_FIXTURE_COMMAND = "get_hub_event_fixtures";
 export const TAURI_RUNTIME_CAPABILITIES_COMMAND = "get_runtime_capabilities";
+export const TAURI_EMIT_FIXTURE_EVENTS_COMMAND = "emit_hub_event_fixtures";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -10,7 +11,8 @@ export type TauriRuntimeDiagnosticCode = "unavailable" | "invoke-failed" | "malf
 export type TauriRuntimeDiagnosticSurface = "fixtureEvents" | "runtimeCapabilities";
 export type TauriRuntimeDiagnosticCommand =
   | typeof TAURI_FIXTURE_COMMAND
-  | typeof TAURI_RUNTIME_CAPABILITIES_COMMAND;
+  | typeof TAURI_RUNTIME_CAPABILITIES_COMMAND
+  | typeof TAURI_EMIT_FIXTURE_EVENTS_COMMAND;
 
 export type TauriRuntimeDiagnostic = {
   code: TauriRuntimeDiagnosticCode;
@@ -89,6 +91,10 @@ const eventSources = new Set<HubEventSource>([
 const fixtureEventsDiagnosticContext = {
   surface: "fixtureEvents",
   command: TAURI_FIXTURE_COMMAND,
+} as const;
+const emitFixtureEventsDiagnosticContext = {
+  surface: "fixtureEvents",
+  command: TAURI_EMIT_FIXTURE_EVENTS_COMMAND,
 } as const;
 const runtimeCapabilitiesDiagnosticContext = {
   surface: "runtimeCapabilities",
@@ -182,6 +188,61 @@ export async function publishTauriFixtureEvents(
   }
 
   return result;
+}
+
+export async function emitTauriFixtureEvents({
+  invoke = getTauriInvoke(),
+}: {
+  invoke?: TauriInvoke;
+} = {}): Promise<
+  | {
+      ok: true;
+      emitted: number;
+    }
+  | {
+      ok: false;
+      diagnostic: TauriRuntimeDiagnostic;
+    }
+> {
+  if (!invoke) {
+    return {
+      ok: false,
+      diagnostic: {
+        ...emitFixtureEventsDiagnosticContext,
+        code: "unavailable",
+        message: "Tauri runtime invoke is unavailable.",
+      },
+    };
+  }
+
+  try {
+    const value = await invoke(TAURI_EMIT_FIXTURE_EVENTS_COMMAND);
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      return {
+        ok: false,
+        diagnostic: {
+          ...emitFixtureEventsDiagnosticContext,
+          code: "malformed",
+          message: "Tauri runtime returned malformed emitted fixture count.",
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      emitted: Math.floor(value),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      diagnostic: {
+        ...emitFixtureEventsDiagnosticContext,
+        code: "invoke-failed",
+        message: "Tauri runtime emit fixture command failed.",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
 }
 
 export async function loadTauriRuntimeCapabilities({
