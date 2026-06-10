@@ -134,13 +134,16 @@ Goal: connect real system data for the first time.
 
 Target: v0.8 or later, after the Tauri shell/runtime boundary is proven.
 
-Stage 5 must begin from the v0.7 diagnostic baseline: runtime `windowsProviders` remains `false`, and provider `origin: "native"` / `support: "preflight"` facts are not working native provider implementations.
+Status: v0.8 system status readiness/preflight work has landed. It prepares privacy-safe diagnostics, source-health UI feedback, and tests only. It does not connect real Windows APIs, add a Rust metrics reader, export a real provider, collect private system data, or change `windowsProviders: false`.
+
+Stage 5 must continue from the v0.7/v0.8 diagnostic baseline: runtime `windowsProviders` remains `false`, and provider `origin: "native"` / `support: "preflight"` facts are not working native provider implementations.
 
 Priority:
 
-1. System information and music status
-2. System notifications without reading private message content
-3. Downloads folder/file-change status
+1. System status native/runtime/provider path planning gate
+2. System information and music status only after separate implementation approval
+3. System notifications without reading private message content
+4. Downloads folder/file-change status
 
 Candidate sources:
 

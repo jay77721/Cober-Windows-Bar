@@ -88,6 +88,18 @@ Project documentation grouped by purpose.
 
 ## Fast Paths By Task
 
+### I want to understand current v0.8 system status readiness
+
+Start here:
+
+- [System status gate completion decision](decisions/v0.8_SYSTEM_STATUS_GATE_COMPLETION_DECISION.md)
+- [First provider candidate decision](decisions/v0.8_FIRST_PROVIDER_CANDIDATE_DECISION.md)
+- [System status privacy checklist](decisions/v0.8_SYSTEM_STATUS_PRIVACY_CHECKLIST.md)
+- `src/runtime/systemPerformanceRuntime.ts`
+- `src/runtime/systemPerformanceRuntime.test.ts`
+
+Current boundary: v0.8 system status work is readiness/preflight only. It defines privacy-safe diagnostics, source-health UI feedback, and tests. It does not implement a real Windows system status provider, Windows API calls, provider lifecycle behavior, runtime-provider wiring, or a `windowsProviders` transition.
+
 ### I want to work on the desktop status center
 
 Start here:

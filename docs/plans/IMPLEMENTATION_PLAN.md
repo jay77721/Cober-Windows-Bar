@@ -4,9 +4,9 @@
 
 Cober-Windows-Bar is a **Windows 11 Unified Status Hub**. It starts as a visual and interaction prototype, then gradually grows into a native-feeling desktop surface for status, developer work, and AI agent activity.
 
-The current route is v0.7 mock/fixture runtime boundary proof and diagnostic closeout. v0.6 closed the mock Provider SDK alignment at `92f3e01 test: harden provider alignment coverage`. Since then, narrow v0.7 slices have landed to prove fixture events can cross the Tauri/runtime boundary, runtime capability facts can be reported truthfully, and provider capability diagnostics can be queried without leaving the existing Event Bus, Store, Resolver, and Showcase UI path.
+The current route has moved through v0.7 mock/fixture runtime boundary proof into v0.8 system status readiness. v0.6 closed the mock Provider SDK alignment at `92f3e01 test: harden provider alignment coverage`. Since then, narrow v0.7 slices have landed to prove fixture events can cross the Tauri/runtime boundary, runtime capability facts can be reported truthfully, and provider capability diagnostics can be queried without leaving the existing Event Bus, Store, Resolver, and Showcase UI path. The v0.8 system status readiness slice adds privacy-safe diagnostic/preflight vocabulary, runtime normalization tests, and compact desktop source-health feedback without adding real native provider behavior.
 
-The completed v0.7 slices are still mock/fixture-only. They do not implement real providers, Windows/system APIs, Tauri tray behavior, always-on-top windowing, production packaging, signing, updater, installer behavior, or real native integration.
+The completed v0.7 and current v0.8 readiness slices are still mock/fixture/preflight-only. They do not implement real providers, Windows/system APIs, Rust metrics readers, Tauri tray behavior, always-on-top windowing, production packaging, signing, updater, installer behavior, runtime-provider wiring, provider lifecycle behavior, or real native integration.
 
 ## 2. Stage Route
 
@@ -15,7 +15,7 @@ The completed v0.7 slices are still mock/fixture-only. They do not implement rea
 - **Stage 2: Architecture Planning** - closed v0.4. Documented runtime boundaries and future Tauri/Windows architecture needs only.
 - **Stage 3: Mock Provider SDK Planning and Alignment** - v0.5/v0.6. Define and align provider lifecycle, registry, runtime, test strategy, mock providers, and provider tests; no Windows/system integration.
 - **Stage 4: Tauri Shell Runtime Spike** - v0.7. Freeze and prove the shell/runtime/IPC boundary with mock or fixture events and diagnostic facts only.
-- **Stage 5: First Real Provider** - v0.8 or later. First real system integration after the Tauri boundary is proven.
+- **Stage 5: First Real Provider** - v0.8 or later. Current v0.8 work is system status readiness/preflight only; first real system integration still requires a separate native/runtime/provider path planning gate and later implementation approval.
 - **Stage 6: Developer Hub** - v0.9 or later. Add Git, Docker, WSL, Maven, Gradle, npm/pnpm, Cargo, and developer workflow surfaces.
 - **Stage 7: AI Agent Hub** - v1.0. Add Codex, Claude, GPT/OpenCode/Gemini-style agent status, queue state, progress, and multi-agent visibility.
 
@@ -239,6 +239,27 @@ Non-goals:
 - Production packaging polish
 
 ## 9. Boundaries
+
+### v0.8 System Status Readiness Boundary
+
+v0.8 system status readiness has prepared the project for a future real provider path without implementing that path.
+
+Completed readiness surface:
+
+- Privacy-safe diagnostic fields: `quality`, `code`, `source`, and optional `lastSuccessfulSource`.
+- Runtime normalization for unsupported, unavailable, permission denied, malformed, timeout, invoke-failed, fallback, and stale states.
+- Compact desktop source-health labels: `Live`, `Fallback`, `Stale`, and `Unavailable`.
+- Decision records that define the privacy checklist, preflight descriptor boundary, runtime payload planning boundary, readiness evidence, rollback/disable criteria, and gate completion decision.
+
+Current source-of-truth entry points:
+
+- `docs/decisions/v0.8_SYSTEM_STATUS_GATE_COMPLETION_DECISION.md`
+- `docs/decisions/v0.8_FIRST_PROVIDER_CANDIDATE_DECISION.md`
+- `docs/decisions/v0.8_SYSTEM_STATUS_PRIVACY_CHECKLIST.md`
+- `src/runtime/systemPerformanceRuntime.ts`
+- `src/runtime/systemPerformanceRuntime.test.ts`
+
+This readiness boundary does not authorize Windows API calls, OS observation, private/raw payload collection, real provider exports, lifecycle behavior, event emission, polling, runtime-provider wiring, UI exposure of real system facts, configuration changes, dependency changes, Rust metrics readers, or a `windowsProviders` transition.
 
 Do not implement these in route reconciliation:
 
