@@ -17,6 +17,7 @@ import {
   useDragController,
   useOverlayPolicy,
   usePreferences,
+  useSystemMonitors,
   useSystemPerformance,
 } from "./hooks";
 import { ClipboardStatusTemplate } from "./templates/ClipboardStatusTemplate";
@@ -74,6 +75,9 @@ export function DesktopPage() {
   // System performance polling
   const { metrics, diagnostic, metricsRef, diagnosticRef, refreshMetrics } = useSystemPerformance();
 
+  // System monitors (Focus Assist, notifications)
+  const systemMonitors = useSystemMonitors();
+
   // Desktop status runtime + aggregation + state resolution
   const {
     resolvedState,
@@ -83,7 +87,10 @@ export function DesktopPage() {
     setPreferredUntil,
     refreshRuntime,
     preferredWindowMs,
-  } = useDesktopStatusRuntime(metrics, diagnostic.quality);
+  } = useDesktopStatusRuntime(metrics, diagnostic.quality, {
+    externalActiveKinds: systemMonitors.externalActiveKinds,
+    externalStates: systemMonitors.externalStates,
+  });
 
   // Preferences
   const { preferences, updatePreferences } = usePreferences();

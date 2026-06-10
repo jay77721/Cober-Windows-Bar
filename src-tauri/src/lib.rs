@@ -39,6 +39,10 @@ const STATUS_CENTER_MENU_ACTION_EVENT: &str = "status-center://menu-action";
 const STATUS_CENTER_SETTINGS_EVENT: &str = "status-center://settings";
 const STATUS_CENTER_OPEN_SETTINGS_EVENT: &str = "status-center://open-settings";
 const STATUS_CENTER_CLIPBOARD_EVENT: &str = "status-center://clipboard-changed";
+const STATUS_CENTER_FOCUS_ASSIST_EVENT: &str = "status-center://focus-assist-changed";
+const STATUS_CENTER_NOTIFICATION_EVENT: &str = "status-center://notifications-changed";
+const FOCUS_ASSIST_MONITOR_INTERVAL: Duration = Duration::from_secs(2);
+const NOTIFICATION_MONITOR_INTERVAL: Duration = Duration::from_secs(5);
 const TRAY_ID: &str = "status-center-tray";
 const PREFERENCES_FILE_NAME: &str = "status-center-preferences.json";
 const MENU_REFRESH_DATA: &str = "refresh-data";
@@ -244,6 +248,21 @@ struct WindowPositionCorrection {
   y: i32,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusAssistStatePayload {
+  active: bool,
+  profile: String,
+  checked_at: u64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NotificationSummaryPayload {
+  focus_assist_active: bool,
+  checked_at: u64,
+}
+
 #[tauri::command]
 fn get_hub_event_fixtures() -> Vec<HubEventFixture> {
   build_hub_event_fixtures(HUB_EVENT_FIXTURE_TICK.load(Ordering::Relaxed))
@@ -282,6 +301,7 @@ fn get_runtime_capabilities() -> RuntimeCapabilities {
 fn get_guest_provider_capabilities() -> GuestProviderCapabilitiesPayload {
   let last_checked_at = unix_time_ms();
   let media_capability = get_media_provider_capability(last_checked_at);
+  let focus_capability = get_focus_provider_capability(last_checked_at);
 
   GuestProviderCapabilitiesPayload {
     providers: vec![
@@ -293,11 +313,11 @@ fn get_guest_provider_capabilities() -> GuestProviderCapabilitiesPayload {
         last_checked_at,
       },
       GuestProviderCapability {
-        kind: "focus",
-        quality: "unavailable",
-        code: "not-implemented",
-        safe_to_display: false,
-        last_checked_at,
+        kind: focus_capability.kind,
+        quality: focus_capability.quality,
+        code: focus_capability.code,
+        safe_to_display: focus_capability.safe_to_display,
+        last_checked_at: focus_capability.last_checked_at,
       },
       GuestProviderCapability {
         kind: media_capability.kind,
@@ -321,6 +341,23 @@ fn get_guest_provider_capabilities() -> GuestProviderCapabilitiesPayload {
         last_checked_at,
       },
     ],
+  }
+}
+
+fn get_focus_provider_capability(last_checked_at: u64) -> GuestProviderCapability {
+  let state = read_focus_assist_state();
+  let (quality, code) = if cfg!(windows) {
+    ("native", "available")
+  } else {
+    ("unavailable", "unsupported")
+  };
+
+  GuestProviderCapability {
+    kind: "focus",
+    quality,
+    code,
+    safe_to_display: cfg!(windows),
+    last_checked_at: state.checked_at.max(last_checked_at),
   }
 }
 
@@ -410,6 +447,70 @@ fn try_media_session_action(_action: &str) -> Result<MediaControlResult, String>
 #[tauri::command]
 fn media_control(action: String) -> Result<MediaControlResult, String> {
   try_media_session_action(&action)
+}
+
+// ---------- Focus Assist Detection (Windows Registry) ----------
+
+#[cfg(windows)]
+fn read_focus_assist_state() -> FocusAssistStatePayload {
+  use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
+  use winreg::RegKey;
+
+  let active = RegKey::predef(HKEY_CURRENT_USER)
+    .open_subkey_with_flags(r"Software\Microsoft\Windows\CurrentVersion\QuietHours", KEY_READ)
+    .and_then(|key| key.get_value::<u32, _>("NFPEnabled"))
+    .map(|v| v == 1)
+    .unwrap_or(false);
+
+  let profile = RegKey::predef(HKEY_CURRENT_USER)
+    .open_subkey_with_flags(r"Software\Microsoft\Windows\CurrentVersion\QuietHours", KEY_READ)
+    .and_then(|key| key.get_value::<String, _>("Profile"))
+    .unwrap_or_default();
+
+  FocusAssistStatePayload {
+    active,
+    profile,
+    checked_at: unix_time_ms(),
+  }
+}
+
+#[cfg(not(windows))]
+fn read_focus_assist_state() -> FocusAssistStatePayload {
+  FocusAssistStatePayload {
+    active: false,
+    profile: String::new(),
+    checked_at: unix_time_ms(),
+  }
+}
+
+#[tauri::command]
+fn get_focus_assist_state() -> FocusAssistStatePayload {
+  read_focus_assist_state()
+}
+
+// ---------- Notification Summary (Windows Registry) ----------
+
+#[cfg(windows)]
+fn read_notification_summary() -> NotificationSummaryPayload {
+  let focus = read_focus_assist_state();
+
+  NotificationSummaryPayload {
+    focus_assist_active: focus.active,
+    checked_at: unix_time_ms(),
+  }
+}
+
+#[cfg(not(windows))]
+fn read_notification_summary() -> NotificationSummaryPayload {
+  NotificationSummaryPayload {
+    focus_assist_active: false,
+    checked_at: unix_time_ms(),
+  }
+}
+
+#[tauri::command]
+fn get_notification_summary() -> NotificationSummaryPayload {
+  read_notification_summary()
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1395,6 +1496,40 @@ pub fn run() {
         });
       }
 
+      // Start Focus Assist state monitor
+      {
+        let focus_app_handle = app.handle().clone();
+        std::thread::spawn(move || {
+          let mut last_active = false;
+          let mut last_profile = String::new();
+          loop {
+            std::thread::sleep(FOCUS_ASSIST_MONITOR_INTERVAL);
+            let state = read_focus_assist_state();
+            if state.active != last_active || state.profile != last_profile {
+              last_active = state.active;
+              last_profile = state.profile.clone();
+              let _ = focus_app_handle.emit(STATUS_CENTER_FOCUS_ASSIST_EVENT, &state);
+            }
+          }
+        });
+      }
+
+      // Start notification summary monitor
+      {
+        let notif_app_handle = app.handle().clone();
+        std::thread::spawn(move || {
+          let mut last_focus_active = false;
+          loop {
+            std::thread::sleep(NOTIFICATION_MONITOR_INTERVAL);
+            let summary = read_notification_summary();
+            if summary.focus_assist_active != last_focus_active {
+              last_focus_active = summary.focus_assist_active;
+              let _ = notif_app_handle.emit(STATUS_CENTER_NOTIFICATION_EVENT, &summary);
+            }
+          }
+        });
+      }
+
       Ok(())
     })
     .on_menu_event({
@@ -1423,6 +1558,8 @@ pub fn run() {
       get_clipboard_content,
       set_clipboard_content,
       media_control,
+      get_focus_assist_state,
+      get_notification_summary,
       get_autostart_enabled,
       set_autostart_enabled
     ])

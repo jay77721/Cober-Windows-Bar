@@ -8,6 +8,7 @@ import type {
   DesktopStatusAggregationInput,
   DesktopStatusAggregationResult,
   DesktopStatusKind,
+  DesktopStatusState,
   DesktopStatusStateMap,
   DesktopUpdateState,
   HubEvent,
@@ -183,8 +184,22 @@ export function aggregateDesktopStatusInput(
   const activeKinds = deriveActiveKinds(hubState, events);
   const availableKinds = normalizeAvailableKinds(input.availableKinds);
 
+  // Merge external states (from system monitors: Focus Assist, notifications, etc.)
+  if (input.externalStates) {
+    for (const [kind, state] of Object.entries(input.externalStates) as [DesktopStatusKind, DesktopStatusState][]) {
+      if (state) {
+        (states as Record<string, unknown>)[kind] = state;
+      }
+    }
+  }
+
+  // Merge external active kinds (deduplicated)
+  const mergedActiveKinds = input.externalActiveKinds?.length
+    ? dedupeKinds([...activeKinds, ...input.externalActiveKinds])
+    : activeKinds;
+
   return {
-    activeKinds,
+    activeKinds: mergedActiveKinds,
     availableKinds,
     states: Object.keys(states).length ? states : undefined,
   };

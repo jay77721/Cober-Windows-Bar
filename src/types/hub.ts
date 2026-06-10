@@ -180,6 +180,8 @@ export type DesktopStatusAggregationInput = {
   now?: number;
   availableKinds?: DesktopStatusKind[];
   sourceHealthByKind?: GuestProviderSourceHealthMap;
+  externalActiveKinds?: DesktopStatusKind[];
+  externalStates?: Partial<DesktopStatusStateMap>;
 };
 
 export type DesktopStatusAggregationResult = {

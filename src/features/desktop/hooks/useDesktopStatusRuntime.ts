@@ -9,6 +9,7 @@ import { resolveDesktopStatusState } from "../../../state/desktopStatusState";
 import { DESKTOP_STATUS_PREFERRED_WINDOW_MS } from "../../../state/desktopStatusScheduler";
 import type {
   DesktopStatusKind,
+  DesktopStatusStateMap,
   HubStoreState,
   SystemPerformanceMetric,
 } from "../../../types/hub";
@@ -25,6 +26,11 @@ export type UseDesktopStatusRuntimeResult = {
   preferredWindowMs: number;
 };
 
+export type SystemMonitorOverrides = {
+  externalActiveKinds?: DesktopStatusKind[];
+  externalStates?: Partial<DesktopStatusStateMap>;
+};
+
 function applyDesktopStatusSnapshot(
   snapshot: DesktopStatusRuntimeSnapshot,
   setter: (state: HubStoreState) => void,
@@ -35,6 +41,7 @@ function applyDesktopStatusSnapshot(
 export function useDesktopStatusRuntime(
   metrics: SystemPerformanceMetric[],
   systemPerformanceSourceQuality: string,
+  systemMonitors?: SystemMonitorOverrides,
 ): UseDesktopStatusRuntimeResult {
   const runtimeRef = useRef<DesktopStatusRuntime>(getDesktopStatusRuntime());
   const initialSnapshot = runtimeRef.current.getSnapshot();
@@ -65,6 +72,8 @@ export function useDesktopStatusRuntime(
   const aggregatedStatus = aggregateDesktopStatusInput({
     hubState,
     availableKinds: DESKTOP_STATUS_TEMPLATE_DESCRIPTORS.map((descriptor) => descriptor.kind),
+    externalActiveKinds: systemMonitors?.externalActiveKinds,
+    externalStates: systemMonitors?.externalStates,
   });
 
   const now = Date.now();
