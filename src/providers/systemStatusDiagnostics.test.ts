@@ -1,12 +1,12 @@
 import { strict as assert } from "node:assert";
 
 type SystemStatusDiagnosticCode =
-  | "unsupported-platform"
-  | "source-unavailable"
+  | "unsupported"
+  | "unavailable"
   | "permission-denied"
-  | "malformed-source-data"
+  | "malformed"
   | "timeout"
-  | "provider-bug";
+  | "invoke-failed";
 
 type SystemStatusFacts = {
   cpuLoadRange?: "low" | "medium" | "high" | "critical" | "unknown";
@@ -46,7 +46,7 @@ const systemStatusCapabilityPreflight = {
 const systemStatusDiagnostics: SystemStatusDiagnosticFixture[] = [
   {
     surface: "systemStatusPreflight",
-    code: "unsupported-platform",
+    code: "unsupported",
     factShape: "coarse-enum",
     redacted: true,
     retryable: false,
@@ -61,7 +61,7 @@ const systemStatusDiagnostics: SystemStatusDiagnosticFixture[] = [
   },
   {
     surface: "systemStatusPreflight",
-    code: "source-unavailable",
+    code: "unavailable",
     factShape: "coarse-enum",
     redacted: true,
     retryable: true,
@@ -91,7 +91,7 @@ const systemStatusDiagnostics: SystemStatusDiagnosticFixture[] = [
   },
   {
     surface: "systemStatusPreflight",
-    code: "malformed-source-data",
+    code: "malformed",
     factShape: "coarse-enum",
     redacted: true,
     retryable: false,
@@ -121,7 +121,7 @@ const systemStatusDiagnostics: SystemStatusDiagnosticFixture[] = [
   },
   {
     surface: "systemStatusPreflight",
-    code: "provider-bug",
+    code: "invoke-failed",
     factShape: "coarse-enum",
     redacted: true,
     retryable: false,
@@ -137,12 +137,12 @@ const systemStatusDiagnostics: SystemStatusDiagnosticFixture[] = [
 ];
 
 const expectedDiagnosticCodes: SystemStatusDiagnosticCode[] = [
-  "unsupported-platform",
-  "source-unavailable",
+  "unsupported",
+  "unavailable",
   "permission-denied",
-  "malformed-source-data",
+  "malformed",
   "timeout",
-  "provider-bug",
+  "invoke-failed",
 ];
 
 const allowedFactValues = new Set([

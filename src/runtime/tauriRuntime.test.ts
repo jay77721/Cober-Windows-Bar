@@ -53,12 +53,12 @@ type SystemStatusRuntimePayloadFixture = {
     networkAvailability: "offline" | "online" | "limited" | "metered" | "unknown";
   };
   diagnosticCodes: Array<
-    | "unsupported-platform"
-    | "source-unavailable"
+    | "unsupported"
+    | "unavailable"
     | "permission-denied"
-    | "malformed-source-data"
+    | "malformed"
     | "timeout"
-    | "provider-bug"
+    | "invoke-failed"
   >;
 };
 
@@ -81,12 +81,12 @@ const systemStatusRuntimePayloadFixture: SystemStatusRuntimePayloadFixture = {
     networkAvailability: "online",
   },
   diagnosticCodes: [
-    "unsupported-platform",
-    "source-unavailable",
+    "unsupported",
+    "unavailable",
     "permission-denied",
-    "malformed-source-data",
+    "malformed",
     "timeout",
-    "provider-bug",
+    "invoke-failed",
   ],
 };
 
@@ -111,12 +111,12 @@ const allowedSystemStatusRuntimePayloadValues = new Set<string>([
   "online",
   "limited",
   "metered",
-  "unsupported-platform",
-  "source-unavailable",
+  "unsupported",
+  "unavailable",
   "permission-denied",
-  "malformed-source-data",
+  "malformed",
   "timeout",
-  "provider-bug",
+  "invoke-failed",
 ]);
 
 const forbiddenSystemStatusRuntimePayloadKeys = new Set([
@@ -263,12 +263,12 @@ function assertSystemStatusRuntimePayloadFixture(value: SystemStatusRuntimePaylo
     "networkAvailability",
   ]);
   assert.deepEqual(value.diagnosticCodes, [
-    "unsupported-platform",
-    "source-unavailable",
+    "unsupported",
+    "unavailable",
     "permission-denied",
-    "malformed-source-data",
+    "malformed",
     "timeout",
-    "provider-bug",
+    "invoke-failed",
   ]);
 
   for (const key of collectKeys(value)) {
