@@ -69,7 +69,7 @@ function visibleMetricValue(value: number) {
   return value <= 0 ? 10 : Math.max(value, 10);
 }
 
-function sourceQualityLabel(quality: SystemPerformanceSourceQuality | undefined) {
+export function sourceQualityLabel(quality: SystemPerformanceSourceQuality | undefined) {
   switch (quality) {
     case "live":
       return "Live";
@@ -83,7 +83,7 @@ function sourceQualityLabel(quality: SystemPerformanceSourceQuality | undefined)
   }
 }
 
-function sourceQualityClassName(quality: SystemPerformanceSourceQuality | undefined) {
+export function sourceQualityClassName(quality: SystemPerformanceSourceQuality | undefined) {
   switch (quality) {
     case "live":
       return "is-live";
