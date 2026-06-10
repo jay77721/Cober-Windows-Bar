@@ -8,13 +8,11 @@ export type HubMode =
 
 export type HubTaskType = "music" | "ai" | "download" | "notification";
 
-export type HubEventType = HubTaskType;
-
 export type HubEventSource = "mock" | "system" | "music" | "download" | "ai" | "notification";
 
 export type SystemPerformanceMetricId = "cpu" | "memory" | "network";
 
-export type SystemPerformanceMetricTone = "blue" | "violet" | "cyan";
+type SystemPerformanceMetricTone = "blue" | "violet" | "cyan";
 
 export type SystemPerformanceMetric = {
   id: SystemPerformanceMetricId;
@@ -43,9 +41,34 @@ export type DesktopStatusKind =
   | "clipboard"
   | "focus";
 
-export type DesktopStatusSource = "default" | "mock" | "system";
+export type DesktopGuestStatusKind = Exclude<DesktopStatusKind, "resident">;
 
-export type DesktopStatusAccentTone = "blue" | "violet" | "cyan" | "green" | "orange" | "pink";
+export type DesktopStatusAttentionReason = "new" | "near-complete" | "completion" | "urgent";
+
+type DesktopStatusSource = "default" | "mock" | "system";
+
+export type GuestProviderSourceQuality = "native" | "app-owned" | "fixture" | "mock" | "unavailable";
+
+export type GuestProviderDiagnosticCode =
+  | "available"
+  | "unsupported"
+  | "permission-denied"
+  | "not-implemented"
+  | "malformed"
+  | "timeout"
+  | "provider-failed";
+
+export type GuestProviderSourceHealth = {
+  kind: DesktopGuestStatusKind;
+  quality: GuestProviderSourceQuality;
+  code: GuestProviderDiagnosticCode;
+  safeToDisplay: boolean;
+  lastCheckedAt: number;
+};
+
+export type GuestProviderSourceHealthMap = Partial<Record<DesktopGuestStatusKind, GuestProviderSourceHealth>>;
+
+type DesktopStatusAccentTone = "blue" | "violet" | "cyan" | "green" | "orange" | "pink";
 
 export type DesktopStatusTemplateDescriptor = {
   kind: DesktopStatusKind;
@@ -54,11 +77,12 @@ export type DesktopStatusTemplateDescriptor = {
   providerHint: string;
 };
 
-export type DesktopStatusBaseState = {
+type DesktopStatusBaseState = {
   kind: DesktopStatusKind;
   title: string;
   subtitle: string;
   source: DesktopStatusSource;
+  sourceHealth?: GuestProviderSourceHealth;
 };
 
 export type DesktopResidentState = DesktopStatusBaseState & {
@@ -132,19 +156,17 @@ export type DesktopStatusResolverInput = {
   previousChangedAt?: number;
   preferredUntil?: number;
   activatedAtByKind?: Partial<Record<DesktopStatusKind, number>>;
+  attentionByKind?: Partial<Record<DesktopStatusKind, DesktopStatusAttentionReason>>;
+  sourceHealthByKind?: GuestProviderSourceHealthMap;
+  userInteractedAt?: number;
+  lastGuestKind?: DesktopStatusKind;
+  lastShownAtByKind?: Partial<Record<DesktopStatusKind, number>>;
 };
 
-export type DesktopStatusSchedulerInput = Pick<
+export type DesktopStatusSchedulerInput = Omit<
   DesktopStatusResolverInput,
-  "preferredKind" | "activeKinds"
-> & {
-  availableKinds?: DesktopStatusKind[];
-  now?: number;
-  previousKind?: DesktopStatusKind;
-  previousChangedAt?: number;
-  preferredUntil?: number;
-  activatedAtByKind?: Partial<Record<DesktopStatusKind, number>>;
-};
+  "metrics" | "systemPerformanceSourceStatus" | "states" | "sourceHealthByKind"
+>;
 
 export type DesktopStatusScheduleDecision = {
   kind: DesktopStatusKind;
@@ -157,12 +179,14 @@ export type DesktopStatusAggregationInput = {
   events?: HubEvent[];
   now?: number;
   availableKinds?: DesktopStatusKind[];
+  sourceHealthByKind?: GuestProviderSourceHealthMap;
 };
 
 export type DesktopStatusAggregationResult = {
   activeKinds: DesktopStatusKind[];
   availableKinds?: DesktopStatusKind[];
   states?: Partial<DesktopStatusStateMap>;
+  attentionByKind?: Partial<Record<DesktopStatusKind, DesktopStatusAttentionReason>>;
 };
 
 export type DesktopStatusPreferenceKey = "alwaysFloat" | "avoidFullscreen" | "lockPosition";
@@ -181,7 +205,7 @@ export type DesktopStatusMenuActionId =
   | "open-settings"
   | "quit";
 
-export type DesktopStatusLabels = {
+type DesktopStatusLabels = {
   metrics: Record<SystemPerformanceMetricId, string>;
   currentUsage: string;
   menu: {
@@ -223,7 +247,7 @@ export type HubTask = {
 
 export type HubEvent = {
   id: string;
-  type: HubEventType;
+  type: HubTaskType;
   source: HubEventSource;
   createdAt: number;
   expiresAt?: number;

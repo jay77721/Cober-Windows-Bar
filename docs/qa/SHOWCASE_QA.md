@@ -150,7 +150,7 @@ Resolver Visualization:
 - `npm run qa:showcase:interactions` passes.
 - `npm run qa:showcase:screenshots` can generate the 1366, 1440, and 1920 screenshots when the dev server is running.
 - `/showcase` remains mock-only and does not require Tauri or real Provider implementation.
-- Stage 1 and Stage 2 mock behavior prove state transitions and provider boundaries without claiming Stage 3-6 capabilities are implemented.
+- Stage 1 and Stage 2 mock behavior prove state transitions and provider boundaries without claiming Stage 5-7 real provider capabilities are fully implemented.
 
 ## v0.2.1 Validation & Polish Gate
 

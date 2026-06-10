@@ -1,4 +1,5 @@
 import { DESKTOP_STATUS_PRIORITY_ORDER } from "../data/desktopStatusConfig";
+import { dedupeKindsOrEmpty } from "../shared/runtimeGuards";
 import type {
   DesktopStatusKind,
   DesktopStatusScheduleDecision,
@@ -18,14 +19,6 @@ function isWithinWindow(timestamp: number | undefined, now: number, durationMs: 
   return timestamp <= now && now - timestamp <= durationMs;
 }
 
-function dedupeKinds(kinds: DesktopStatusKind[] | undefined): DesktopStatusKind[] {
-  if (!kinds?.length) {
-    return [];
-  }
-
-  return kinds.filter((kind, index) => kinds.indexOf(kind) === index);
-}
-
 function filterKnownKinds(kinds: DesktopStatusKind[] | undefined): DesktopStatusKind[] {
   if (!kinds?.length) {
     return [];
@@ -40,10 +33,10 @@ export function getDesktopStatusPriorityOrder(): DesktopStatusKind[] {
 
 export function scheduleDesktopStatus(input: DesktopStatusSchedulerInput): DesktopStatusScheduleDecision {
   const now = typeof input.now === "number" && Number.isFinite(input.now) ? input.now : 0;
-  const availableKinds = filterKnownKinds(dedupeKinds(input.availableKinds));
+  const availableKinds = filterKnownKinds(dedupeKindsOrEmpty(input.availableKinds));
   const preferredKind = input.preferredKind;
   const previousKind = input.previousKind;
-  const activeKinds = filterKnownKinds(dedupeKinds(input.activeKinds));
+  const activeKinds = filterKnownKinds(dedupeKindsOrEmpty(input.activeKinds));
   const activeAvailableKinds = activeKinds.filter((kind) => availableKinds.includes(kind));
   const preferredStillPinned =
     preferredKind &&

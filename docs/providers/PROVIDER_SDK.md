@@ -1,16 +1,54 @@
 # Provider SDK
 
-The Provider SDK is the Stage 2 boundary for future integrations. In v0.3.2 it is still a showcase demo path only: mock providers emit fake `HubEvent` objects through the existing event path so the resolver and Hub UI can be tested without desktop or system integration.
+The Provider SDK defines the contract for all status data sources in Cober-Windows-Bar. Providers normalize their domain-specific data into `HubEvent` objects and publish them through the event bus, keeping the UI agnostic to data origin.
+
+## Current Status (v0.8)
+
+The Provider SDK contract and infrastructure are fully implemented. Mock providers exercise the full pipeline. Real native data (system performance, media session) currently flows through the runtime layer directly and is being migrated into the Provider SDK pattern.
+
+### What exists today
+
+- **Provider interface** (`src/providers/types.ts`): Full lifecycle contract — `start()`, `stop()`, `subscribe()`.
+- **Provider Registry** (`src/providers/providerRegistry.ts`): Registration, lookup, lifecycle tracking, capability support metadata, diagnostic summaries.
+- **Provider Adapter** (`src/providers/providerAdapter.ts`): Bridges provider events into the event bus with per-event failure isolation.
+- **Mock Providers** (`src/providers/mockProviders.ts`): Music, Download, AI Task, and Notification providers with deterministic fake data.
+- **Native data via runtime layer**: System performance (CPU/RAM/network) and media session (GSMTC) data flow through `src/runtime/` into the frontend, bypassing the provider SDK. This is the next area to be unified.
+
+### What is pending
+
+- Wrap system performance and media session as `HubProvider` implementations.
+- Register native providers in the `ProviderRegistry` with proper lifecycle management.
+- Route native data through the provider adapter → event bus → store → resolver path.
+- Implement remaining providers: Focus, Clipboard, Downloads, Notifications.
 
 ## Contract
 
 Providers expose a small lifecycle and listener contract:
 
 ```ts
-interface Provider {
-  start(): void;
-  stop(): void;
+interface HubProvider {
+  id: string;
+  displayName: string;
+  capabilities: ProviderCapability[];
+
+  start(): Promise<void>;
+  stop(): Promise<void>;
   subscribe(listener: (events: HubEvent[]) => void): () => void;
+  getStatus(): ProviderStatus;
+}
+
+type ProviderStatus =
+  | "idle"
+  | "starting"
+  | "running"
+  | "stopping"
+  | "stopped"
+  | "error";
+
+interface ProviderCapability {
+  kind: HubEventType;
+  origin: "mock" | "native" | "hybrid";
+  support: "available" | "preflight" | "unavailable";
 }
 ```
 
@@ -24,38 +62,91 @@ The contract keeps provider ownership separate from hub rendering:
 ## Event Flow
 
 ```text
-Mock Provider
-  -> provider adapter
+Provider (mock or native)
+  -> provider adapter (connectProviderToEventBus)
   -> publishHubEvent()
-  -> store
-  -> resolver
-  -> existing Hub UI
+  -> store (createHubStoreState)
+  -> resolver (resolveDesktopStatusState)
+  -> Hub UI (status templates)
 ```
 
 Validation target:
 
 ```text
-Mock MusicProvider event -> adapter -> event bus -> resolver -> Music mode
-Mock DownloadProvider event -> adapter -> event bus -> resolver -> Download mode
-Mock AITaskProvider event -> adapter -> event bus -> resolver -> AI Progress mode
-Mock NotificationProvider event -> adapter -> event bus -> resolver -> Notification mode
+MusicProvider event    -> adapter -> event bus -> resolver -> Media mode
+DownloadProvider event -> adapter -> event bus -> resolver -> Download mode
+AITaskProvider event   -> adapter -> event bus -> resolver -> AI Progress mode
+NotificationProvider   -> adapter -> event bus -> resolver -> Notification mode
+SystemProvider event   -> adapter -> event bus -> resolver -> Resident mode (metrics)
 ```
 
-## v0.3.2 Showcase Demo Scope
+## Provider Registry
 
-- Clarify provider lifecycle and event ownership.
-- Keep mock providers deterministic for tests and demo capture.
-- Demonstrate the provider path: provider adapter -> event bus -> store/resolver -> existing Hub UI.
-- Preserve the existing `/showcase` visual design.
+The registry (`ProviderRegistry`) tracks provider discovery, registration, health, and availability.
 
-## Current Limitations
+Key methods:
 
-v0.3.2 does not add:
+- `register(provider)` — Register a provider with its metadata and capabilities.
+- `unregister(id)` — Remove a provider and clean up subscriptions.
+- `get(id)` — Look up a registered provider.
+- `list()` — List all registered providers.
+- `listCapabilitySupport()` — Return copied capability facts per provider kind.
+- `summarizeCapabilitySupport()` — Aggregate diagnostic capability support across providers.
 
-- Tauri, IPC, tray, always-on-top, or desktop-shell behavior.
-- Windows/system APIs.
-- Real music, download, notification, system, or AI-task providers.
-- Media-session readers, file watchers, notification-center readers, or external service integrations.
-- Showcase visual redesign or new product surfaces.
+Boundary rules:
 
-Real providers belong to Stage 4 after the Provider SDK and desktop-shell layers are stable.
+- Registry health or availability does not mean an emitted event is active, complete, failed, or cleared.
+- Registry state does not decide the current hub mode.
+- Registry paths must publish `HubEvent` objects through the Event Bus before hub UI state changes.
+- The Registry does not bypass the Event Bus, Store, or Resolver.
+
+## Mock Providers
+
+Four mock providers are implemented for development and showcase:
+
+| Provider | Event Type | Description |
+|----------|-----------|-------------|
+| `MockMusicProvider` | `music` | Emits fake "Midnight City" playback events with progress |
+| `MockDownloadProvider` | `download` | Emits fake file download progress events |
+| `MockAITaskProvider` | `ai` | Emits fake AI generation task progress |
+| `MockNotificationProvider` | `notification` | Emits fake notification events with expiry |
+
+All mock providers use deterministic data from `mockHubData.ts` and support full lifecycle (start/stop/subscribe).
+
+## Native Providers (In Progress)
+
+### System Performance Provider (Connected, needs SDK wrapping)
+
+- **Source**: Rust `sysinfo` crate via `get_system_performance` Tauri command
+- **Data**: CPU usage %, memory usage %, network throughput %
+- **Current path**: `systemPerformanceRuntime.ts` → `DesktopPage.tsx` (bypasses provider SDK)
+- **Target**: Wrap as `SystemPerformanceProvider` implementing `HubProvider`
+
+### Media Session Provider (Connected, needs SDK wrapping)
+
+- **Source**: Windows GSMTC API via `get_media_session_status` Tauri command
+- **Data**: Playback status (playing/paused), position (ms), duration (ms)
+- **Current path**: `tauriRuntime.ts` → `DesktopPage.tsx` (bypasses provider SDK)
+- **Target**: Wrap as `MediaSessionProvider` implementing `HubProvider`
+
+### Planned Providers
+
+| Provider | Source | Status |
+|----------|--------|--------|
+| Focus | Windows Focus Assist API | Not started |
+| Clipboard | Windows `AddClipboardFormatListener` | Not started |
+| Downloads | File system watcher / browser API | Not started |
+| Notifications | Windows Notification Listener API | Not started |
+| Developer tools | Git, Docker, WSL, build systems | Planned (Stage 6) |
+| AI Agents | Codex, Claude, GPT agent sessions | Planned (Stage 7) |
+
+## Privacy Boundaries
+
+All providers must respect these privacy rules:
+
+- Only coarse metrics are collected: CPU %, memory %, network throughput category.
+- Media session exposes only playback status, position, and duration — not track metadata unless explicitly surfaced.
+- No process lists, window titles, usernames, file paths, credentials, or hardware serials cross the IPC boundary.
+- Diagnostic fields use bounded enums: `quality` (live/fallback/stale/unavailable), `code` (available/unsupported/permission-denied/etc.).
+- Notification providers must not read private message content.
+- File watchers must not expose full file paths or contents.

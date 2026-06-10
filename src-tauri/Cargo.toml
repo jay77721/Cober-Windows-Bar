@@ -30,3 +30,4 @@ tauri-plugin-global-shortcut = "2.3.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.58", features = ["Foundation", "Media_Control"] }

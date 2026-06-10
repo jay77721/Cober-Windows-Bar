@@ -4,24 +4,25 @@ import {
   getCurrentWindow,
   type Monitor,
 } from "@tauri-apps/api/window";
+import { isRecord } from "../shared/runtimeGuards";
 import { getTauriInvoke, type TauriInvoke } from "./tauriRuntime";
 
 export const STATUS_WINDOW_OVERLAY_POLICY_COMMAND = "get_overlay_policy";
 export const STATUS_WINDOW_FLOATING_COMMAND = "set_status_window_floating";
 export const STATUS_WINDOW_CORRECT_POSITION_COMMAND = "correct_status_window_position";
-export const STATUS_WINDOW_EDGE_MARGIN = 8;
-export const STATUS_WINDOW_TOPMOST_REASSERT_MS = 1800;
-export const STATUS_WINDOW_POSITION_CORRECTION_MS = 2400;
-export const STATUS_WINDOW_STARTUP_REASSERT_AT_MS = [1000, 5000, 9000] as const;
+const STATUS_WINDOW_EDGE_MARGIN = 8;
+const STATUS_WINDOW_TOPMOST_REASSERT_MS = 1800;
+const STATUS_WINDOW_POSITION_CORRECTION_MS = 2400;
+const STATUS_WINDOW_STARTUP_REASSERT_AT_MS = [1000, 5000, 9000] as const;
 export const STATUS_WINDOW_SCALE_CHANGE_DEBOUNCE_MS = 500;
 export const STATUS_WINDOW_DISPLAY_CHANGE_DEBOUNCE_MS = 220;
 
-export type OverlayPolicy = {
+type OverlayPolicy = {
   foregroundFullscreen: boolean;
   shouldFloat: boolean;
 };
 
-export type StatusWindowOverlayMode =
+type StatusWindowOverlayMode =
   | "floating"
   | "suppressed_for_fullscreen"
   | "restoring";
@@ -36,7 +37,7 @@ export type StatusWindowOverlayState = {
   startupReassertPendingAt: number[];
 };
 
-export type StatusWindowDragState = {
+type StatusWindowDragState = {
   startPointerX: number;
   startPointerY: number;
   startWindowX: number;
@@ -66,7 +67,7 @@ export function createStatusWindowOverlayState(): StatusWindowOverlayState {
   };
 }
 
-export async function captureStatusWindowDragState(
+async function captureStatusWindowDragState(
   pointerX: number,
   pointerY: number,
   edgeMargin = STATUS_WINDOW_EDGE_MARGIN,
@@ -92,7 +93,7 @@ export async function captureStatusWindowDragState(
   }
 }
 
-export async function moveStatusWindowDrag(
+async function moveStatusWindowDrag(
   dragState: StatusWindowDragState,
   pointerX: number,
   pointerY: number,
@@ -286,8 +287,4 @@ function consumeStartupReasserts(queue: number[], now: number): number {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

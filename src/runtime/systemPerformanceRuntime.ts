@@ -1,8 +1,9 @@
 import { systemPerformanceMetrics } from "../data/mockHubData";
-import type { SystemPerformanceMetric } from "../types/hub";
+import { isRecord } from "../shared/runtimeGuards";
+import type { SystemPerformanceMetric, SystemPerformanceSnapshot } from "../types/hub";
 import { getTauriInvoke, type TauriInvoke } from "./tauriRuntime";
 
-export const TAURI_SYSTEM_PERFORMANCE_COMMAND = "get_system_performance";
+const TAURI_SYSTEM_PERFORMANCE_COMMAND = "get_system_performance";
 const DEFAULT_SYSTEM_STATUS_PREFLIGHT_TIMEOUT_MS = 1500;
 
 const SYSTEM_PERFORMANCE_LABELS = {
@@ -11,13 +12,7 @@ const SYSTEM_PERFORMANCE_LABELS = {
   network: "\u7F51\u7EDC",
 } as const;
 
-export type SystemPerformanceSnapshot = {
-  cpu: number;
-  memory: number;
-  network: number;
-};
-
-export const SYSTEM_STATUS_DIAGNOSTIC_QUALITIES = [
+const SYSTEM_STATUS_DIAGNOSTIC_QUALITIES = [
   "live",
   "fallback",
   "stale",
@@ -31,16 +26,16 @@ export const SYSTEM_STATUS_DIAGNOSTIC_CODES = [
   "timeout",
   "invoke-failed",
 ] as const;
-export const SYSTEM_STATUS_DIAGNOSTIC_SOURCES = [
+const SYSTEM_STATUS_DIAGNOSTIC_SOURCES = [
   "mock",
   "tauri-fixture",
   "tauri-event",
   "preflight",
 ] as const;
 
-export type SystemStatusDiagnosticQuality = (typeof SYSTEM_STATUS_DIAGNOSTIC_QUALITIES)[number];
+type SystemStatusDiagnosticQuality = (typeof SYSTEM_STATUS_DIAGNOSTIC_QUALITIES)[number];
 export type SystemStatusDiagnosticCode = (typeof SYSTEM_STATUS_DIAGNOSTIC_CODES)[number];
-export type SystemStatusDiagnosticSource = (typeof SYSTEM_STATUS_DIAGNOSTIC_SOURCES)[number];
+type SystemStatusDiagnosticSource = (typeof SYSTEM_STATUS_DIAGNOSTIC_SOURCES)[number];
 
 export type SystemStatusDiagnostic = {
   quality: SystemStatusDiagnosticQuality;
@@ -49,7 +44,7 @@ export type SystemStatusDiagnostic = {
   lastSuccessfulSource?: SystemStatusDiagnosticSource;
 };
 
-export type SystemPerformanceStatusResult = {
+type SystemPerformanceStatusResult = {
   metrics: SystemPerformanceMetric[];
   diagnostic: SystemStatusDiagnostic;
 };
@@ -107,7 +102,7 @@ export async function loadSystemPerformanceStatus({
   }
 }
 
-export function createSystemPerformanceMetrics(
+function createSystemPerformanceMetrics(
   snapshot: SystemPerformanceSnapshot,
 ): SystemPerformanceMetric[] {
   return [
@@ -290,10 +285,6 @@ function toPercent(value: unknown): number | undefined {
   }
 
   return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function snapshotSystemPerformanceMetrics(metrics: SystemPerformanceMetric[]): SystemPerformanceMetric[] {

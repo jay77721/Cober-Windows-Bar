@@ -2,113 +2,162 @@
 
 ## Scope
 
-This document defines the v0.5.1 test strategy for the Mock Provider SDK implementation plan. It is documentation only: v0.5.1 does not add test code, provider code, runtime code, Tauri/Rust/IPC code, or Windows/system API implementation.
+This document defines the test strategy for Cober-Windows-Bar. It covers both the implemented test suites and the planned test coverage for upcoming provider work.
 
-The categories below describe the minimum assertions future tests should cover. v0.6 may implement these tests and any supporting code after the provider runtime and SDK contracts are ready to exercise.
+## Current Test Suites
 
-## Lifecycle Tests
+The project has 16 test files organized by layer:
 
-Lifecycle tests should validate the expected provider state transitions and emitted lifecycle events.
+### State Tests
 
-Minimum assertions:
+- `src/state/hubState.test.ts` — Event bus publish/subscribe, store snapshot, mode resolution, scenario resolution, expiry, clear-to-idle, playback order.
+- `src/state/desktopStatusScheduler.test.ts` — Priority scheduling, preferred-kind pinning, user interaction lock, guest cooldown, attention tracking.
+- `src/state/desktopStatusState.test.ts` — State resolution, template merging, source health integration.
+- `src/state/desktopStatusAggregation.test.ts` — Event aggregation, active kind detection, attention scoring.
 
-- A provider starts from an idle or stopped state and reaches a running state.
-- A running provider can be stopped and reaches a stopped state.
-- Start and stop operations emit the expected lifecycle notifications in order.
-- Failed start attempts surface an error state without leaving the provider marked as running.
-- Failed stop attempts preserve enough state for the caller to know whether cleanup is still required.
-- Repeated lifecycle operations do not lose the provider identity, registration metadata, or subscription relationships.
+### Provider Tests
 
-## Registry Tests
+- `src/providers/provider.test.ts` — Mock provider lifecycle, event emission, adapter integration.
+- `src/providers/providerRegistry.test.ts` — Registration, lookup, removal, lifecycle tracking, capability support summaries.
+- `src/providers/systemStatusDiagnostics.test.ts` — Diagnostic vocabulary, quality/code classification.
 
-Registry tests should validate provider registration, lookup, and removal behavior.
+### Runtime Tests
 
-Minimum assertions:
+- `src/runtime/tauriRuntime.test.ts` — IPC bridge, fixture loading, capability detection, malformed data handling, error classification, media session conversion.
+- `src/runtime/desktopStatusInputRuntime.test.ts` — Three-tier source selection, polling behavior, fallback logic.
+- `src/runtime/systemPerformanceRuntime.test.ts` — Metrics normalization, quality tracking (live/fallback/stale/unavailable), last-source contract.
+- `src/runtime/desktopProductRuntime.test.ts` — Menu action, settings, open-settings event listeners.
+- `src/runtime/statusWindowRuntime.test.ts` — Overlay state, floating policy, position correction.
 
-- Registering a provider stores its id, display metadata, capability metadata, and initial lifecycle state.
-- Looking up a registered provider by id returns the same logical provider record.
-- Listing providers includes registered providers exactly once.
-- Removing a registered provider makes it unavailable for lookup and list operations.
-- Registry operations reject invalid or incomplete provider records.
-- Registry state remains consistent when lifecycle operations update provider status.
+### UI Tests
 
-## Cleanup Tests
+- `src/features/desktop/templates/ResidentStatusTemplate.test.ts` — Resident status template rendering.
 
-Cleanup tests should validate that provider resources, subscriptions, and registry records are released when a provider stops or is removed.
+### Data Tests
 
-Minimum assertions:
+- `src/data/mockHubData.test.ts` — Mock data integrity, scenario fixtures.
 
-- Stopping a provider releases active mock timers, pending progress emitters, and queued notification work owned by that provider.
-- Removing a provider clears its subscriptions and prevents future events from reaching removed subscribers.
-- Cleanup is idempotent when called more than once for the same provider.
-- Cleanup after a failed start does not throw because partially initialized resources are missing.
+## Running Tests
+
+```bash
+npm run qa                    # Full QA: all tests + showcase interactions + build
+npm run test:state            # State management tests only
+npm run test:providers        # Provider tests only
+npm run test:runtime          # Runtime bridge tests only
+npm run qa:showcase:interactions  # Showcase interaction QA only
+npm run build                 # Production build (type-check)
+```
+
+## Test Principles
+
+### Lifecycle Tests
+
+Validate provider state transitions and emitted lifecycle events:
+
+- Provider starts from idle/stopped and reaches running state.
+- Running provider can be stopped and reaches stopped state.
+- Start and stop emit expected lifecycle notifications in order.
+- Failed start surfaces error state without leaving provider marked as running.
+- Failed stop preserves enough state for cleanup awareness.
+- Repeated lifecycle operations preserve provider identity, metadata, and subscriptions.
+
+### Registry Tests
+
+Validate provider registration, lookup, and removal:
+
+- Registering stores id, display metadata, capability metadata, and initial lifecycle state.
+- Lookup by id returns the same logical provider record.
+- Listing includes registered providers exactly once.
+- Removing makes provider unavailable for lookup and list.
+- Operations reject invalid or incomplete records.
+- State remains consistent when lifecycle operations update status.
+
+### Cleanup Tests
+
+Validate resource release on stop or removal:
+
+- Stopping releases active timers, pending progress emitters, and queued work.
+- Removing clears subscriptions and prevents future events.
+- Cleanup is idempotent.
+- Cleanup after failed start does not throw.
 - Cleanup does not affect unrelated providers or subscribers.
 
-## Duplicate Start Tests
+### Duplicate Start Tests
 
-Duplicate start tests should validate that the SDK handles concurrent or repeated start requests predictably.
+Validate concurrent or repeated start handling:
 
-Minimum assertions:
+- Starting a running provider does not create a second instance.
+- Concurrent starts resolve to one running state.
+- Duplicate starts do not duplicate subscriptions, timers, or emitters.
+- Caller receives stable result for duplicate attempts.
+- No extra running notifications beyond expected lifecycle sequence.
 
-- Starting an already running provider does not create a second provider runtime instance.
-- Concurrent start requests resolve to one running provider state.
-- Duplicate starts do not duplicate subscriptions, notification timers, or progress emitters.
-- The caller receives a stable result for duplicate start attempts, either by sharing the existing start result or returning a clear already-running outcome.
-- Duplicate start handling emits no extra running notifications beyond the expected lifecycle sequence.
+### Subscription Tests
 
-## Subscription Tests
+Validate event subscription, delivery, and unsubscription:
 
-Subscription tests should validate event subscription, event delivery, and unsubscription behavior.
-
-Minimum assertions:
-
-- Subscribers receive events for the provider or channel they subscribed to.
-- Subscribers do not receive events from unrelated providers or channels.
-- Multiple subscribers can receive the same event without mutating each other's delivery state.
+- Subscribers receive events for their provider/channel.
+- Subscribers do not receive events from unrelated providers.
+- Multiple subscribers receive the same event without cross-contamination.
 - Unsubscribed listeners stop receiving future events.
-- Subscription cleanup occurs when a provider is stopped or removed.
-- Subscriber errors do not prevent delivery to other subscribers.
+- Subscription cleanup occurs on provider stop or removal.
+- Subscriber errors do not prevent delivery to others.
 
-## Notification Expiry
+### Notification Expiry Tests
 
-Notification expiry tests should validate notification time-to-live behavior and removal from visible state.
+Validate notification time-to-live:
 
-Minimum assertions:
-
-- Notifications with an expiry value remain visible until their expiry time is reached.
-- Expired notifications are removed from the active notification list.
+- Notifications with expiry remain visible until expiry time.
+- Expired notifications are removed from active list.
 - Expiry cleanup does not remove non-expired notifications.
-- Manual notification dismissal prevents later expiry work from reintroducing the notification.
-- Provider cleanup cancels pending expiry work for notifications owned by that provider.
+- Manual dismissal prevents expiry reintroduction.
+- Provider cleanup cancels pending expiry work.
 
-## Progress Sequence
+### Progress Sequence Tests
 
-Progress sequence tests should validate the order and completeness of progress updates emitted by mock provider operations.
+Validate progress update order and completeness:
 
-Minimum assertions:
+- Progress begins with initial event identifying operation and provider.
+- Progress values move forward monotonically.
+- Final event indicates completion, cancellation, or failure.
+- Completion events do not precede required intermediate state.
+- Failed operations stop emitting success progress.
+- Parallel operations keep progress identifiers distinct.
 
-- Progress begins with an initial event that identifies the operation and provider.
-- Progress values move forward monotonically for a single operation.
-- The final progress event indicates completion, cancellation, or failure.
-- Completion events are not emitted before required intermediate progress state.
-- Failed operations stop emitting success progress after the failure event.
-- Parallel operations keep progress identifiers distinct so events cannot be mixed between operations.
+### Event Spam and Backpressure Tests
 
-## Event Spam and Backpressure
+Validate high-volume event stream handling:
 
-Event spam and backpressure tests should validate that high-volume event streams remain bounded and observable.
+- Rapid emission does not crash registry, dispatcher, or notification store.
+- Queues/buffers/coalescing remain within bounds.
+- Slow subscribers do not block lifecycle cleanup.
+- Dropped/coalesced/throttled events are observable through diagnostics.
+- Backpressure preserves terminal lifecycle and progress events.
+- Spam from one provider does not starve others.
 
-Minimum assertions:
+## Planned Test Additions
 
-- Rapid provider event emission does not crash the registry, subscription dispatcher, or notification store.
-- Event queues, buffers, or coalescing rules remain within documented bounds.
-- Slow subscribers do not block lifecycle cleanup for the provider.
-- Dropped, coalesced, or throttled events are observable through documented diagnostics or counters.
-- Backpressure handling preserves terminal lifecycle and progress events.
-- Event spam from one provider does not starve unrelated providers.
+### Native Provider Tests (Stage 5)
 
-## v0.5.1 Non-Goals
+As system performance and media session get wrapped into Provider SDK implementations:
 
-v0.5.1 does not implement the tests described here. It also does not add test harnesses, mock provider runtime code, Tauri IPC tests, Rust tests, Windows API shims, or provider SDK implementation changes.
+- `SystemPerformanceProvider` lifecycle and event emission tests.
+- `MediaSessionProvider` lifecycle and GSMTC data conversion tests.
+- Provider registry integration with native providers.
+- Mock fallback behavior when Tauri is unavailable.
 
-These assertions are intended to guide v0.6 test and implementation work once the Mock Provider SDK surfaces are stable enough to verify with executable tests.
+### New Provider Tests (Stage 5 continued)
+
+For each new provider (Focus, Clipboard, Downloads, Notifications):
+
+- Provider lifecycle tests (start/stop/health).
+- Data normalization tests.
+- Privacy boundary tests (no forbidden data in events).
+- Error handling and graceful degradation.
+- Registry integration.
+
+### Integration Tests (Stage 5+)
+
+- End-to-end: Rust command → Tauri IPC → runtime adapter → event bus → store → resolver → UI state.
+- Multi-provider concurrent operation.
+- Provider failure isolation (one provider failing does not affect others).

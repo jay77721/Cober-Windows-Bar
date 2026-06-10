@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "Cober Windows Bar",
-        "width": 420,
+        "width": 315,
         "height": 80,
-        "minWidth": 420,
+        "minWidth": 315,
         "minHeight": 80,
         "center": true,
         "resizable": false,

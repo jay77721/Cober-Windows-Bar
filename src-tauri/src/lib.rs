@@ -24,6 +24,12 @@ use windows_sys::Win32::{
   },
 };
 
+#[cfg(windows)]
+use windows::Media::Control::{
+  GlobalSystemMediaTransportControlsSessionManager,
+  GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+};
+
 const STATUS_WINDOW_EDGE_MARGIN: i32 = 8;
 const STATUS_WINDOW_LABEL: &str = "main";
 const STATUS_CENTER_HUB_EVENTS_EVENT: &str = "status-center://hub-events";
@@ -43,6 +49,8 @@ const TRAY_MENU_SHOW_STATUS_CENTER: &str = "tray-show-status-center";
 const TRAY_MENU_OPEN_SETTINGS: &str = "tray-open-settings";
 const GLOBAL_SHORTCUT_RECALL: &str = "Alt+Shift+Space";
 const HUB_EVENT_FIXTURE_INTERVAL: Duration = Duration::from_secs(5);
+const STATUS_WINDOW_CONFIGURED_WIDTH: u16 = 315;
+const STATUS_WINDOW_CONFIGURED_HEIGHT: u16 = 80;
 
 static HUB_EVENT_FIXTURE_TICK: AtomicU64 = AtomicU64::new(0);
 
@@ -90,9 +98,27 @@ struct StatusCenterMenuItems<R: tauri::Runtime> {
   lock_position: tauri::menu::CheckMenuItem<R>,
 }
 
+struct NetworkSample {
+  total_bytes: u64,
+  sampled_at: std::time::Instant,
+}
+
+struct SystemPerformanceCache {
+  network_sample: Option<NetworkSample>,
+}
+
+impl Default for SystemPerformanceCache {
+  fn default() -> Self {
+    Self {
+      network_sample: None,
+    }
+  }
+}
+
 struct DesktopProductState<R: tauri::Runtime> {
   preferences: DesktopStatusPreferences,
   menu_items: Option<StatusCenterMenuItems<R>>,
+  perf_cache: SystemPerformanceCache,
 }
 
 impl<R: tauri::Runtime> Default for DesktopProductState<R> {
@@ -100,6 +126,7 @@ impl<R: tauri::Runtime> Default for DesktopProductState<R> {
     Self {
       preferences: DesktopStatusPreferences::default(),
       menu_items: None,
+      perf_cache: SystemPerformanceCache::default(),
     }
   }
 }
@@ -134,6 +161,34 @@ struct RuntimeCapabilities {
   always_on_top: bool,
   windows_providers: bool,
   configured_shell_window: ConfiguredShellWindow,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GuestProviderCapability {
+  kind: &'static str,
+  quality: &'static str,
+  code: &'static str,
+  safe_to_display: bool,
+  last_checked_at: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GuestProviderCapabilitiesPayload {
+  providers: Vec<GuestProviderCapability>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MediaSessionStatus {
+  available: bool,
+  playback_status: &'static str,
+  progress: u8,
+  position_ms: Option<u64>,
+  duration_ms: Option<u64>,
+  code: &'static str,
+  checked_at: u64,
 }
 
 #[derive(Serialize)]
@@ -196,10 +251,10 @@ fn get_runtime_capabilities() -> RuntimeCapabilities {
     configured_shell_window: ConfiguredShellWindow {
      configured: true,
      title: "Cober Windows Bar".into(),
-      width: 420,
-      height: 80,
-      min_width: 420,
-      min_height: 80,
+      width: STATUS_WINDOW_CONFIGURED_WIDTH,
+      height: STATUS_WINDOW_CONFIGURED_HEIGHT,
+      min_width: STATUS_WINDOW_CONFIGURED_WIDTH,
+      min_height: STATUS_WINDOW_CONFIGURED_HEIGHT,
      resizable: false,
      centered: true,
     },
@@ -207,23 +262,83 @@ fn get_runtime_capabilities() -> RuntimeCapabilities {
 }
 
 #[tauri::command]
-fn get_system_performance() -> SystemPerformanceSnapshot {
-  let mut system = System::new_all();
+fn get_guest_provider_capabilities() -> GuestProviderCapabilitiesPayload {
+  let last_checked_at = unix_time_ms();
+  let media_capability = get_media_provider_capability(last_checked_at);
 
-  system.refresh_cpu();
-  std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-  system.refresh_cpu();
-  system.refresh_memory();
+  GuestProviderCapabilitiesPayload {
+    providers: vec![
+      GuestProviderCapability {
+        kind: "update",
+        quality: "unavailable",
+        code: "not-implemented",
+        safe_to_display: false,
+        last_checked_at,
+      },
+      GuestProviderCapability {
+        kind: "focus",
+        quality: "unavailable",
+        code: "not-implemented",
+        safe_to_display: false,
+        last_checked_at,
+      },
+      GuestProviderCapability {
+        kind: media_capability.kind,
+        quality: media_capability.quality,
+        code: media_capability.code,
+        safe_to_display: media_capability.safe_to_display,
+        last_checked_at: media_capability.last_checked_at,
+      },
+      GuestProviderCapability {
+        kind: "download",
+        quality: "unavailable",
+        code: "not-implemented",
+        safe_to_display: false,
+        last_checked_at,
+      },
+      GuestProviderCapability {
+        kind: "clipboard",
+        quality: "unavailable",
+        code: "not-implemented",
+        safe_to_display: false,
+        last_checked_at,
+      },
+    ],
+  }
+}
 
-  let cpu = clamp_percent(system.global_cpu_info().cpu_usage() as f64);
-  let memory = if system.total_memory() == 0 {
-    0
-  } else {
-    clamp_percent((system.used_memory() as f64 / system.total_memory() as f64) * 100.0)
-  };
-  let network = sample_network_percent();
+#[tauri::command]
+fn get_media_session_status() -> MediaSessionStatus {
+  read_media_session_status()
+}
 
-  SystemPerformanceSnapshot { cpu, memory, network }
+#[tauri::command]
+async fn get_system_performance(
+  state: tauri::State<'_, SharedDesktopProductState<tauri::Wry>>,
+) -> Result<SystemPerformanceSnapshot, String> {
+  let (cpu, memory) = tauri::async_runtime::spawn_blocking(|| {
+    let mut system = System::new_all();
+
+    system.refresh_cpu();
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    system.refresh_cpu();
+    system.refresh_memory();
+
+    let cpu = clamp_percent(system.global_cpu_info().cpu_usage() as f64);
+    let memory = if system.total_memory() == 0 {
+      0
+    } else {
+      clamp_percent((system.used_memory() as f64 / system.total_memory() as f64) * 100.0)
+    };
+
+    (cpu, memory)
+  })
+  .await
+  .map_err(|e| format!("spawn_blocking failed: {e}"))?;
+
+  let network = sample_network_percent(&state);
+
+  Ok(SystemPerformanceSnapshot { cpu, memory, network })
 }
 
 #[tauri::command]
@@ -384,21 +499,136 @@ fn quit_status_center(app: tauri::AppHandle) -> Result<(), String> {
   Ok(())
 }
 
-fn sample_network_percent() -> u8 {
+/// Normalizes network throughput against a 1 Gbps reference bandwidth (~125 MB/s).
+/// Uses delta-based rate calculation between invocations for accurate throughput measurement.
+fn sample_network_percent(state: &SharedDesktopProductState<tauri::Wry>) -> u8 {
   let mut networks = Networks::new_with_refreshed_list();
   networks.refresh();
 
-  let total_bytes_received: u64 = networks
+  let total_bytes: u64 = networks
     .values()
-    .map(|data| data.received())
+    .map(|data| data.received() + data.transmitted())
     .sum();
-  let total_bytes_transmitted: u64 = networks
-    .values()
-    .map(|data| data.transmitted())
-    .sum();
-  let total_bytes = total_bytes_received + total_bytes_transmitted;
+  let now = std::time::Instant::now();
 
-  clamp_percent((total_bytes as f64 / 1_250_000.0) * 100.0)
+  let mut percent: u8 = 0;
+
+  if let Ok(mut guard) = state.lock() {
+    let cache = &mut guard.perf_cache;
+
+    if let Some(prev) = &cache.network_sample {
+      let elapsed = now.duration_since(prev.sampled_at).as_secs_f64();
+
+      if elapsed > 0.05 {
+        let delta_bytes = total_bytes.saturating_sub(prev.total_bytes);
+        let bytes_per_second = delta_bytes as f64 / elapsed;
+        // Normalize against 1 Gbps (125 MB/s) reference bandwidth
+        percent = clamp_percent((bytes_per_second / 125_000_000.0) * 100.0);
+      }
+      // else: too short interval, keep percent at 0 to avoid spikes
+    }
+    // else: first sample, no previous data — keep percent at 0
+
+    cache.network_sample = Some(NetworkSample {
+      total_bytes,
+      sampled_at: now,
+    });
+  }
+  // else: lock poisoned, fall back to 0
+
+  percent
+}
+
+fn get_media_provider_capability(last_checked_at: u64) -> GuestProviderCapability {
+  let status = read_media_session_status_at(last_checked_at);
+  let (quality, code, safe_to_display) = match status.code {
+    "available" | "not-playing" => ("native", "available", true),
+    "unsupported" => ("unavailable", "unsupported", false),
+    _ => ("unavailable", status.code, false),
+  };
+
+  GuestProviderCapability {
+    kind: "media",
+    quality,
+    code,
+    safe_to_display,
+    last_checked_at,
+  }
+}
+
+fn read_media_session_status() -> MediaSessionStatus {
+  read_media_session_status_at(unix_time_ms())
+}
+
+#[cfg(windows)]
+fn read_media_session_status_at(checked_at: u64) -> MediaSessionStatus {
+  match read_windows_media_session_status(checked_at) {
+    Ok(status) => status,
+    Err(_) => MediaSessionStatus {
+      available: false,
+      playback_status: "unavailable",
+      progress: 0,
+      position_ms: None,
+      duration_ms: None,
+      code: "provider-failed",
+      checked_at,
+    },
+  }
+}
+
+#[cfg(not(windows))]
+fn read_media_session_status_at(checked_at: u64) -> MediaSessionStatus {
+  MediaSessionStatus {
+    available: false,
+    playback_status: "unsupported",
+    progress: 0,
+    position_ms: None,
+    duration_ms: None,
+    code: "unsupported",
+    checked_at,
+  }
+}
+
+#[cfg(windows)]
+fn read_windows_media_session_status(checked_at: u64) -> windows::core::Result<MediaSessionStatus> {
+  let manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()?.get()?;
+  let session = manager.GetCurrentSession()?;
+  let playback_info = session.GetPlaybackInfo()?;
+  let playback_status = playback_info.PlaybackStatus()?;
+  let timeline = session.GetTimelineProperties()?;
+  let position_ms = duration_100ns_to_ms(timeline.Position()?.Duration);
+  let duration_ms = duration_100ns_to_ms(timeline.EndTime()?.Duration);
+  let progress = match (position_ms, duration_ms) {
+    (Some(position), Some(duration)) if duration > 0 => {
+      clamp_percent((position as f64 / duration as f64) * 100.0)
+    }
+    _ => 0,
+  };
+  let playback_status_label =
+    if playback_status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing {
+      "playing"
+    } else {
+      "paused"
+    };
+
+  Ok(MediaSessionStatus {
+    available: true,
+    playback_status: playback_status_label,
+    progress,
+    position_ms,
+    duration_ms,
+    code: "available",
+    checked_at,
+  })
+}
+
+#[cfg(windows)]
+fn duration_100ns_to_ms(value: i64) -> Option<u64> {
+  if value <= 0 {
+    return None;
+  }
+
+  Some((value as u64) / 10_000)
 }
 
 fn build_hub_event_fixtures(tick: u64) -> Vec<HubEventFixture> {
@@ -479,21 +709,6 @@ fn build_hub_event_fixtures(tick: u64) -> Vec<HubEventFixture> {
       }),
     },
   ]
-}
-
-fn emit_next_hub_event_fixture_batch<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> usize {
-  let tick = HUB_EVENT_FIXTURE_TICK.fetch_add(1, Ordering::Relaxed);
-  let fixtures = build_hub_event_fixtures(tick);
-  let emitted = fixtures.len();
-  emit_hub_events(app, fixtures);
-  emitted
-}
-
-fn start_hub_event_fixture_stream<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
-  std::thread::spawn(move || loop {
-    std::thread::sleep(HUB_EVENT_FIXTURE_INTERVAL);
-    emit_next_hub_event_fixture_batch(&app);
-  });
 }
 
 fn unix_time_ms() -> u64 {
@@ -1028,8 +1243,6 @@ pub fn run() {
       }
 
       emit_status_center_settings(app.handle(), &preferences);
-      emit_next_hub_event_fixture_batch(app.handle());
-      start_hub_event_fixture_stream(app.handle().clone());
 
       Ok(())
     })
@@ -1043,6 +1256,8 @@ pub fn run() {
       get_hub_event_fixtures,
       emit_hub_event_fixtures,
       get_runtime_capabilities,
+      get_guest_provider_capabilities,
+      get_media_session_status,
       get_system_performance,
       get_overlay_policy,
       set_status_window_floating,

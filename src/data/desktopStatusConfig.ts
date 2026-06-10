@@ -2,7 +2,6 @@ import type {
   DesktopStatusConfig,
   DesktopStatusKind,
   DesktopStatusMenuAction,
-  DesktopStatusPreferenceKey,
   DesktopStatusStateMap,
   DesktopStatusTemplateDescriptor,
   SystemPerformanceMetric,
@@ -183,7 +182,7 @@ export const DESKTOP_STATUS_TEMPLATE_DESCRIPTORS: DesktopStatusTemplateDescripto
   ...COPY.templateDescriptors,
 ];
 
-export const desktopStatusConfig: DesktopStatusConfig = {
+const desktopStatusConfig: DesktopStatusConfig = {
   preferences: {
     alwaysFloat: true,
     avoidFullscreen: true,
@@ -201,30 +200,12 @@ export const desktopStatusConfig: DesktopStatusConfig = {
   ],
 };
 
-export function getDesktopStatusConfig(): DesktopStatusConfig {
-  return desktopStatusConfig;
-}
-
 export function getDesktopStatusLabels() {
   return desktopStatusConfig.labels;
 }
 
-export function getDesktopStatusPreferences() {
-  return desktopStatusConfig.preferences;
-}
-
 export function getDesktopStatusMenuActions(): DesktopStatusMenuAction[] {
   return desktopStatusConfig.menuActions;
-}
-
-export function getDesktopStatusPreferenceEntries() {
-  return desktopStatusConfig.menuActions.filter(
-    (
-      action,
-    ): action is DesktopStatusMenuAction & {
-      preferenceKey: DesktopStatusPreferenceKey;
-    } => action.kind === "toggle" && Boolean(action.preferenceKey),
-  );
 }
 
 export function createSystemPerformanceMetricSnapshot(

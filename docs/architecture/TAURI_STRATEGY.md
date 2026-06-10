@@ -2,145 +2,150 @@
 
 ## Purpose
 
-v0.4 is an architecture planning milestone only. It should make the runtime boundary, desktop-shell assumptions, and future Tauri spike requirements explicit without introducing Rust code, IPC code, Windows APIs, packaging scripts, or real providers.
-
-The near-term goal is to keep the React status hub moving through a stable mock runtime while planning the path to a native Windows desktop runtime.
+This document describes the Tauri integration strategy for Cober-Windows-Bar. The Tauri runtime is now fully integrated (as of v0.7+), providing the desktop shell, native system APIs, and IPC boundary for the application.
 
 ## Version Placement
 
-- **v0.4 Architecture Planning**: document runtime boundaries, shell needs, IPC shape, packaging expectations, and provider sequencing. No implementation.
-- **v0.5 Mock Provider SDK**: keep provider contracts and validation mock-only inside the web/runtime boundary.
-- **v0.6 Mock Provider SDK Alignment**: closed at `92f3e01 test: harden provider alignment coverage`.
-- **v0.7 Tauri Scope Freeze and Spike**: plan and then prove the smallest useful Tauri desktop shell/runtime/IPC boundary with mocked or fixture data and diagnostic facts only.
-- **v0.8 First Real Provider**: add the first real Windows-facing provider after the runtime boundary and IPC model are proven.
-- **v0.9 Developer Hub**: expand provider surfaces for developer workflows.
-- **v1.0 AI Agent Hub**: make long-running AI agent activity a first-class status surface.
+- **v0.4 Architecture Planning**: documented runtime boundaries, shell needs, IPC shape, packaging expectations, and provider sequencing. (Completed)
+- **v0.5 Mock Provider SDK**: provider contracts and validation kept mock-only inside the web/runtime boundary. (Completed)
+- **v0.6 Mock Provider SDK Alignment**: closed at `92f3e01 test: harden provider alignment coverage`. (Completed)
+- **v0.7 Tauri Integration**: full desktop shell, runtime, and IPC boundary implemented with real native capabilities. (Completed)
+- **v0.8 First Real Providers**: system performance and media session providers connected through Tauri IPC. (In Progress)
+- **v0.9 Developer Hub**: expand provider surfaces for developer workflows. (Planned)
+- **v1.0 AI Agent Hub**: make long-running AI agent activity a first-class status surface. (Planned)
 
-## Runtime Boundary
+## Runtime Layers
 
-The product should evolve through three runtime layers:
-
-```text
-Mock Runtime -> Tauri Runtime -> Windows Runtime
-```
-
-### Mock Runtime
-
-The current runtime remains the source of truth for mock data and fixture-driven review. It includes mocked events, fake providers, resolver behavior, showcase controls, and docs that describe the future system without depending on native capabilities.
-
-Responsibilities:
-
-- Emit deterministic mock `HubEvent` data.
-- Validate provider contracts without operating-system access.
-- Keep resolver behavior testable in the web app.
-- Preserve a fast iteration loop for UI, state, and architecture docs.
-
-### Tauri Runtime
-
-The v0.7 spike should prove that the web UI can run inside a native desktop shell and communicate across a minimal IPC boundary. It should use mocked or fixture provider data only unless a later phase explicitly authorizes real providers.
-
-Architecture needs:
-
-- A transparent or acrylic-feeling window suitable for a compact status hub.
-- Docking rules for the lower-right desktop area above the Windows taskbar.
-- Always-on-top and focus behavior appropriate for a passive status surface.
-- Startup behavior and lifecycle hooks.
-- A narrow IPC contract that can carry normalized hub events and runtime commands.
-- Failure behavior when the native layer is unavailable or returns malformed data.
-
-Current v0.7 diagnostic facts:
-
-- Fixture event loading reports `surface: "fixtureEvents"` and the intended `get_hub_event_fixtures` command.
-- Fixture events are copied at the runtime load and publish boundaries so Event Bus publication cannot mutate the returned runtime result payloads or metadata.
-- Runtime capability loading reports `surface: "runtimeCapabilities"` and the intended `get_runtime_capabilities` command.
-- Runtime capabilities remain static and truthful: fixture IPC can be reported, configured shell-window facts can be reported, and `windowsProviders`, tray, and always-on-top remain `false`.
-- Provider capability diagnostics may include `origin: "native"` and `support: "preflight"` for music, but that is only a preflight descriptor for future work.
-
-Non-goals for the spike:
-
-- Real Windows providers.
-- Broad Rust module design.
-- Deep system API integration.
-- Production packaging polish.
-- UI redesign.
-- Store, Resolver, provider lifecycle, or runtime-provider wiring changes.
-- Background services beyond what is needed to test shell viability.
-
-### Windows Runtime
-
-The Windows runtime comes after the Tauri spike. It should own real system integration and convert native signals into the same normalized event contract already exercised by mock providers.
-
-Future responsibilities:
-
-- Windows Media Session or equivalent music status.
-- Downloads folder/file-change status.
-- Notification status without reading private message content unless a future privacy design explicitly allows it.
-- System information such as CPU, RAM, battery, network, or active workload.
-- Developer workflow providers when the later Developer Hub phase begins.
-- AI agent session providers when Stage 6 begins.
-
-## IPC Planning
-
-IPC should be treated as an architecture boundary, not a v0.4 implementation task.
-
-Planned shape:
+The product operates through three runtime layers, all now active:
 
 ```text
-Windows Provider -> Windows Runtime -> Tauri IPC -> Runtime Adapter -> publishHubEvent() -> store -> resolver -> Hub UI
+Mock Runtime (fallback) -> Tauri Runtime (active) -> Windows Runtime (partial)
 ```
 
-Requirements to capture before implementation:
+### Mock Runtime (Fallback)
 
-- Event payloads must stay normalized around the existing `HubEvent` model.
-- IPC messages should be small, serializable, versionable, and easy to inspect during debugging.
-- The UI should not know whether an event came from a mock provider, Tauri IPC, or a Windows API.
-- Native errors should become explicit runtime status events or diagnostics, not silent UI failures.
-- Privacy-sensitive providers must define what is collected, what is ignored, and what never crosses IPC.
+The mock runtime remains available when Tauri is not present (e.g., `npm run dev` in a browser). It provides:
 
-## Window And Shell Requirements
+- Deterministic mock `HubEvent` data from `mockHubData.ts` and `mockProviders.ts`.
+- Showcase controls for manual event injection.
+- Provider contract validation without operating-system access.
+- Fast iteration loop for UI, state, and architecture work.
 
-These are architecture needs for v0.4 and spike candidates for v0.7:
+### Tauri Runtime (Active)
 
-- Compact floating status surface.
-- Transparent/acrylic-feeling visual treatment where supported.
-- Lower-right docking above the Windows taskbar.
-- Always-on-top behavior that does not interrupt active work.
-- Click-through or focus behavior decision, if needed, after user testing.
-- Multi-monitor positioning rules.
-- Startup behavior, tray presence, and exit/restart behavior.
-- DPI and scaling behavior for common Windows 11 display settings.
+The Tauri runtime is the primary production runtime. It provides:
 
-## Packaging Requirements
+- **Desktop shell**: 315×80px compact floating window, Fluent Design styling.
+- **Window management**: Always-on-top (Z-order via `HWND_TOPMOST`/`HWND_BOTTOM`), tool window style (`WS_EX_TOOLWINDOW`), position correction to monitor work areas, multi-monitor support.
+- **Fullscreen avoidance**: Detects fullscreen foreground windows via Win32 APIs (`GetForegroundWindow`, `GetWindowRect`, `MonitorFromWindow`) and auto-hides the status bar.
+- **System tray**: Tray icon with context menu (show/settings/quit), left-click toggle visibility.
+- **Global hotkey**: `Alt+Shift+Space` to recall/show the status window.
+- **Preferences persistence**: JSON file storage for always-float, avoid-fullscreen, lock-position settings.
+- **IPC command set**: 16 Tauri commands bridging Rust backend to TypeScript frontend.
 
-Packaging should be planned in v0.4 and tested only as part of the v0.7 spike or later.
+### Windows Runtime (Partial)
 
-Architecture needs:
+Real Windows API integrations currently active:
 
-- Development builds should remain fast for React/UI iteration.
-- Desktop builds should be reproducible and documented.
-- App identity, icon, signing, updater, installer, and autostart decisions should be separated from provider implementation.
-- Packaging should not be allowed to pull real Windows providers into v0.7 unless a later phase explicitly changes that boundary.
+- **System performance**: CPU, memory, and network metrics via `sysinfo` crate.
+- **Media session**: Windows GSMTC API for real-time playback status, position, and duration.
+- **Window management**: Full Win32 API integration for Z-order, tool window style, fullscreen detection.
+
+Not yet implemented:
+
+- Windows notification center reader.
+- Downloads folder file watcher.
+- Focus Assist API integration.
+- Clipboard monitoring.
+
+## IPC Architecture
+
+The IPC boundary carries normalized data between Rust and TypeScript:
+
+```text
+Windows API -> Rust Backend -> Tauri IPC (invoke/events) -> Runtime Adapter -> Event Bus -> Store -> Resolver -> UI
+```
+
+### IPC Commands (TypeScript → Rust)
+
+| Command | Purpose |
+|---------|---------|
+| `get_system_performance` | CPU/memory/network snapshot |
+| `get_runtime_capabilities` | Runtime feature flags |
+| `get_guest_provider_capabilities` | Per-provider availability status |
+| `get_media_session_status` | Current media playback state |
+| `get_hub_event_fixtures` | Test fixture events |
+| `emit_hub_event_fixtures` | Push fixture events via Tauri event system |
+| `get_overlay_policy` | Fullscreen detection + float decision |
+| `set_status_window_floating` | Toggle always-on-top |
+| `correct_status_window_position` | Clamp to monitor work area |
+| `start_window_drag` | Begin native window drag |
+| `show_status_center_context_menu` | Native context menu at coordinates |
+| `get_status_center_settings` | Read current preferences |
+| `set_status_center_preferences` | Write preferences + update menu state |
+| `show_status_center_window` | Show/recall the status window |
+| `open_status_center_settings` | Request settings panel open |
+| `quit_status_center` | Exit the application |
+
+### IPC Events (Rust → TypeScript)
+
+| Event | Purpose |
+|-------|---------|
+| `status-center://hub-events` | Real-time hub event push stream |
+| `status-center://menu-action` | Context menu item selected |
+| `status-center://settings` | Preferences changed externally |
+| `status-center://open-settings` | Settings panel open requested |
+
+### IPC Requirements
+
+- Event payloads stay normalized around the `HubEvent` model.
+- IPC messages are small, serializable, and inspectable.
+- The UI does not know whether an event came from mock, fixture, or native source.
+- Native errors become explicit runtime diagnostics, not silent failures.
+- Privacy-sensitive data never crosses IPC (see privacy checklist).
+
+## Window And Shell Behavior
+
+Implemented:
+
+- Compact floating status surface (315×80px, non-resizable).
+- Tool window style (hidden from taskbar).
+- Lower-right positioning with work area clamping and 8px edge margin.
+- Always-on-top via Z-order management (not Tauri's `set_always_on_top`, using direct `SetWindowPos` for finer control).
+- Fullscreen avoidance with automatic hide/show based on foreground window.
+- Multi-monitor support with position correction on display/scale changes.
+- Debounced correction (500ms for scale changes, 220ms for display changes).
+- Startup position reassertion at 1s, 5s, and 9s intervals.
+
+Future:
+
+- Click-through mode (pending user testing).
+- Edge snapping/alignment.
+- Custom window chrome for Fluent Design acrylic effect.
+
+## Packaging
+
+Current state:
+
+- Tauri dev mode works (`npm run tauri dev`).
+- Build configuration in `tauri.conf.json`.
+
+Future needs:
+
+- Code signing certificate.
+- MSI/NSIS installer configuration.
+- Auto-updater integration.
+- Windows SmartScreen compatibility.
 
 ## Provider Sequencing
 
-Real Windows providers should wait until the runtime boundary is proven.
+Real providers are being integrated in this order:
 
-Recommended order:
-
-1. **v0.5 Mock Provider SDK**: finish the fake provider contract and adapter path.
-2. **v0.6 Mock Provider SDK Alignment**: align canonical events, lifecycle/health, metadata, registry, and provider tests.
-3. **v0.7 Tauri Scope Freeze and Spike**: prove shell/runtime/IPC using mock or fixture events and diagnostic facts.
-4. **v0.8 First Real Provider**: choose one low-risk Windows provider and keep its event output compatible with the mock provider contract.
-5. **v0.9 Developer Hub**: add developer workflow providers once runtime diagnostics and provider lifecycle handling are stable.
-6. **v1.0 AI Agent Hub**: add AI agent sessions as a top-level product surface.
-
-## v0.4 Non-Goals
-
-- No Tauri setup.
-- No Rust code.
-- No IPC implementation.
-- No tray, always-on-top, startup, or packaging implementation.
-- No Windows APIs.
-- No media session, notification center, file watcher, or system information integration.
-- No real providers.
-- No changes to `src/`, `package.json`, `scripts/`, or binary assets.
+1. ✅ **System Performance** — CPU, memory, network via sysinfo (connected, needs Provider SDK wrapping)
+2. ✅ **Media Session** — Windows GSMTC playback status (connected, needs Provider SDK wrapping)
+3. ⬜ **Focus/Do Not Disturb** — Windows Focus Assist API
+4. ⬜ **Clipboard** — Windows clipboard monitoring
+5. ⬜ **Downloads** — File system watcher or browser integration
+6. ⬜ **Notifications** — Windows notification center (privacy-safe)
+7. ⬜ **Developer tools** — Git, Docker, WSL, build systems (Stage 6)
+8. ⬜ **AI Agents** — Codex, Claude, GPT agent sessions (Stage 7)

@@ -1,4 +1,5 @@
 import { listen, type Event, type UnlistenFn } from "@tauri-apps/api/event";
+import { isRecord } from "../shared/runtimeGuards";
 import type { DesktopStatusMenuActionId, DesktopStatusPreferencesPayload } from "../types/hub";
 
 export const STATUS_CENTER_MENU_ACTION_EVENT = "status-center://menu-action";
@@ -164,6 +165,4 @@ function isDesktopStatusPreferences(
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+

@@ -1,18 +1,40 @@
 import { invoke as invokeCommand, isTauri } from "@tauri-apps/api/core";
-import type { HubEvent, HubEventSource, HubEventType } from "../types/hub";
+import {
+  isFiniteNumber,
+  isOptionalNumber,
+  isRecord,
+  parseHubEvents,
+  snapshotHubEvent,
+} from "../shared/runtimeGuards";
+import type {
+  DesktopGuestStatusKind,
+  GuestProviderDiagnosticCode,
+  GuestProviderSourceHealth,
+  GuestProviderSourceHealthMap,
+  GuestProviderSourceQuality,
+  HubEvent,
+} from "../types/hub";
 
 export const TAURI_FIXTURE_COMMAND = "get_hub_event_fixtures";
 export const TAURI_RUNTIME_CAPABILITIES_COMMAND = "get_runtime_capabilities";
 export const TAURI_EMIT_FIXTURE_EVENTS_COMMAND = "emit_hub_event_fixtures";
+export const TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND = "get_guest_provider_capabilities";
+export const TAURI_MEDIA_SESSION_STATUS_COMMAND = "get_media_session_status";
 
 export type TauriInvoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 
-export type TauriRuntimeDiagnosticCode = "unavailable" | "invoke-failed" | "malformed";
-export type TauriRuntimeDiagnosticSurface = "fixtureEvents" | "runtimeCapabilities";
-export type TauriRuntimeDiagnosticCommand =
+type TauriRuntimeDiagnosticCode = "unavailable" | "invoke-failed" | "malformed";
+type TauriRuntimeDiagnosticSurface =
+  | "fixtureEvents"
+  | "runtimeCapabilities"
+  | "guestProviderCapabilities"
+  | "mediaSession";
+type TauriRuntimeDiagnosticCommand =
   | typeof TAURI_FIXTURE_COMMAND
   | typeof TAURI_RUNTIME_CAPABILITIES_COMMAND
-  | typeof TAURI_EMIT_FIXTURE_EVENTS_COMMAND;
+  | typeof TAURI_EMIT_FIXTURE_EVENTS_COMMAND
+  | typeof TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND
+  | typeof TAURI_MEDIA_SESSION_STATUS_COMMAND;
 
 export type TauriRuntimeDiagnostic = {
   code: TauriRuntimeDiagnosticCode;
@@ -22,7 +44,7 @@ export type TauriRuntimeDiagnostic = {
   detail?: string;
 };
 
-export type TauriRuntimeResult =
+type TauriRuntimeResult =
   | {
       ok: true;
       events: HubEvent[];
@@ -41,7 +63,7 @@ export type TauriRuntimeCapabilities = {
   configuredShellWindow: TauriConfiguredShellWindow;
 };
 
-export type TauriConfiguredShellWindow = {
+type TauriConfiguredShellWindow = {
   configured: true;
   title: string;
   width: number;
@@ -52,7 +74,7 @@ export type TauriConfiguredShellWindow = {
   centered: boolean;
 };
 
-export type TauriRuntimeCapabilitiesResult =
+type TauriRuntimeCapabilitiesResult =
   | {
       ok: true;
       capabilities: TauriRuntimeCapabilities;
@@ -62,7 +84,38 @@ export type TauriRuntimeCapabilitiesResult =
       diagnostic: TauriRuntimeDiagnostic;
     };
 
-export type HubEventPublisher = {
+type TauriGuestProviderCapabilitiesResult =
+  | {
+      ok: true;
+      sourceHealthByKind: GuestProviderSourceHealthMap;
+    }
+  | {
+      ok: false;
+      diagnostic: TauriRuntimeDiagnostic;
+    };
+
+export type TauriMediaSessionStatus = {
+  available: boolean;
+  playbackStatus: "playing" | "paused" | "unavailable" | "unsupported";
+  progress: number;
+  positionMs?: number;
+  durationMs?: number;
+  code: "available" | "not-playing" | "unsupported" | "provider-failed";
+  checkedAt: number;
+};
+
+type TauriMediaSessionResult =
+  | {
+      ok: true;
+      status: TauriMediaSessionStatus;
+      event?: HubEvent;
+    }
+  | {
+      ok: false;
+      diagnostic: TauriRuntimeDiagnostic;
+    };
+
+type HubEventPublisher = {
   publishHubEvent(event: HubEvent): void;
 };
 
@@ -79,15 +132,6 @@ type TauriGlobal = {
   isTauri?: boolean;
 };
 
-const eventTypes = new Set<HubEventType>(["music", "ai", "download", "notification"]);
-const eventSources = new Set<HubEventSource>([
-  "mock",
-  "system",
-  "music",
-  "download",
-  "ai",
-  "notification",
-]);
 const fixtureEventsDiagnosticContext = {
   surface: "fixtureEvents",
   command: TAURI_FIXTURE_COMMAND,
@@ -100,6 +144,31 @@ const runtimeCapabilitiesDiagnosticContext = {
   surface: "runtimeCapabilities",
   command: TAURI_RUNTIME_CAPABILITIES_COMMAND,
 } as const;
+const guestProviderCapabilitiesDiagnosticContext = {
+  surface: "guestProviderCapabilities",
+  command: TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND,
+} as const;
+const mediaSessionDiagnosticContext = {
+  surface: "mediaSession",
+  command: TAURI_MEDIA_SESSION_STATUS_COMMAND,
+} as const;
+const guestKinds = new Set<DesktopGuestStatusKind>(["media", "download", "update", "clipboard", "focus"]);
+const guestQualities = new Set<GuestProviderSourceQuality>([
+  "native",
+  "app-owned",
+  "fixture",
+  "mock",
+  "unavailable",
+]);
+const guestDiagnosticCodes = new Set<GuestProviderDiagnosticCode>([
+  "available",
+  "unsupported",
+  "permission-denied",
+  "not-implemented",
+  "malformed",
+  "timeout",
+  "provider-failed",
+]);
 
 export function getTauriInvoke(globalScope: unknown = globalThis): TauriInvoke | undefined {
   const tauri = (globalScope as TauriGlobal | undefined)?.__TAURI__;
@@ -137,9 +206,21 @@ export async function loadTauriFixtureHubEvents({
 
   try {
     const value = await invoke(TAURI_FIXTURE_COMMAND);
-    const events = parseHubEvents(value);
 
-    if (!events) {
+    if (!Array.isArray(value)) {
+      return {
+        ok: false,
+        diagnostic: {
+          ...fixtureEventsDiagnosticContext,
+          code: "malformed",
+          message: "Tauri runtime returned malformed HubEvent fixtures.",
+        },
+      };
+    }
+
+    const events = parseHubEvents(value).map(snapshotHubEvent);
+
+    if (events.length !== value.length) {
       return {
         ok: false,
         diagnostic: {
@@ -293,22 +374,203 @@ export async function loadTauriRuntimeCapabilities({
   }
 }
 
-function parseHubEvents(value: unknown): HubEvent[] | undefined {
-  if (!Array.isArray(value)) {
+export async function loadTauriGuestProviderCapabilities({
+  invoke = getTauriInvoke(),
+  timeoutMs,
+}: {
+  invoke?: TauriInvoke;
+  timeoutMs?: number;
+} = {}): Promise<TauriGuestProviderCapabilitiesResult> {
+  if (!invoke) {
+    return {
+      ok: false,
+      diagnostic: {
+        ...guestProviderCapabilitiesDiagnosticContext,
+        code: "unavailable",
+        message: "Tauri runtime invoke is unavailable.",
+      },
+    };
+  }
+
+  try {
+    const value = await invokeWithOptionalTimeout(
+      invoke(TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND),
+      timeoutMs,
+    );
+    const sourceHealthByKind = parseGuestProviderCapabilities(value);
+
+    if (!sourceHealthByKind) {
+      return {
+        ok: false,
+        diagnostic: {
+          ...guestProviderCapabilitiesDiagnosticContext,
+          code: "malformed",
+          message: "Tauri runtime returned malformed guest provider capability facts.",
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      sourceHealthByKind,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "timeout") {
+      return {
+        ok: true,
+        sourceHealthByKind: createUnavailableGuestProviderSourceHealthMap("timeout"),
+      };
+    }
+
+    return {
+      ok: false,
+      diagnostic: {
+        ...guestProviderCapabilitiesDiagnosticContext,
+        code: "invoke-failed",
+        message: "Tauri runtime guest provider capability command failed.",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+}
+
+export async function loadTauriMediaSessionStatus({
+  invoke = getTauriInvoke(),
+  timeoutMs,
+}: {
+  invoke?: TauriInvoke;
+  timeoutMs?: number;
+} = {}): Promise<TauriMediaSessionResult> {
+  if (!invoke) {
+    return {
+      ok: false,
+      diagnostic: {
+        ...mediaSessionDiagnosticContext,
+        code: "unavailable",
+        message: "Tauri runtime media session invoke is unavailable.",
+      },
+    };
+  }
+
+  try {
+    const value = await invokeWithOptionalTimeout(
+      invoke(TAURI_MEDIA_SESSION_STATUS_COMMAND),
+      timeoutMs,
+    );
+    const status = parseMediaSessionStatus(value);
+
+    if (!status) {
+      return {
+        ok: false,
+        diagnostic: {
+          ...mediaSessionDiagnosticContext,
+          code: "malformed",
+          message: "Tauri runtime returned malformed media session facts.",
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      status,
+      event: createMediaSessionHubEvent(status),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      diagnostic: {
+        ...mediaSessionDiagnosticContext,
+        code: "invoke-failed",
+        message: "Tauri runtime media session command failed.",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+}
+
+export function createUnavailableGuestProviderSourceHealthMap(
+  code: GuestProviderDiagnosticCode,
+  lastCheckedAt = Date.now(),
+): GuestProviderSourceHealthMap {
+  const sourceHealthByKind: GuestProviderSourceHealthMap = {};
+
+  for (const kind of guestKinds) {
+    sourceHealthByKind[kind] = {
+      kind,
+      quality: "unavailable",
+      code,
+      safeToDisplay: false,
+      lastCheckedAt,
+    };
+  }
+
+  return sourceHealthByKind;
+}
+
+function createMediaSessionHubEvent(status: TauriMediaSessionStatus): HubEvent | undefined {
+  if (!status.available) {
     return undefined;
   }
 
-  const events = value.filter(isHubEvent);
+  const subtitle = status.playbackStatus === "playing" ? "Playing" : "Media ready";
 
-  return events.length === value.length ? events.map(snapshotHubEvent) : undefined;
+  return {
+    id: "native-media-session",
+    type: "music",
+    source: "music",
+    createdAt: status.checkedAt,
+    expiresAt: status.checkedAt + 4_500,
+    progress: status.progress,
+    payload: {
+      title: "Media session",
+      subtitle,
+      time: formatMediaTime(status.positionMs, status.durationMs),
+      progress: status.progress,
+    },
+    metadata: {
+      provider: "windows-media-session",
+      privacy: "coarse",
+    },
+  };
 }
 
-function snapshotHubEvent(event: HubEvent): HubEvent {
-  return {
-    ...event,
-    payload: event.payload ? { ...event.payload } : undefined,
-    metadata: event.metadata ? { ...event.metadata } : undefined,
-  };
+function formatMediaTime(positionMs: number | undefined, durationMs: number | undefined): string {
+  if (!isFinitePositiveNumber(positionMs) || !isFinitePositiveNumber(durationMs)) {
+    return "Playing";
+  }
+
+  return `${formatDuration(positionMs)} / ${formatDuration(durationMs)}`;
+}
+
+function formatDuration(valueMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(valueMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+async function invokeWithOptionalTimeout<T>(
+  value: Promise<T>,
+  timeoutMs: number | undefined,
+): Promise<T> {
+  if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return value;
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      value,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("timeout")), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
 }
 
 function parseRuntimeCapabilities(value: unknown): TauriRuntimeCapabilities | undefined {
@@ -337,6 +599,96 @@ function parseRuntimeCapabilities(value: unknown): TauriRuntimeCapabilities | un
   };
 }
 
+function parseGuestProviderCapabilities(value: unknown): GuestProviderSourceHealthMap | undefined {
+  const items = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.providers)
+      ? value.providers
+      : undefined;
+
+  if (!items) {
+    return undefined;
+  }
+
+  const sourceHealthByKind: GuestProviderSourceHealthMap = {};
+
+  for (const item of items) {
+    const sourceHealth = parseGuestProviderSourceHealth(item);
+    if (!sourceHealth) {
+      return undefined;
+    }
+
+    sourceHealthByKind[sourceHealth.kind] = sourceHealth;
+  }
+
+  return sourceHealthByKind;
+}
+
+function parseGuestProviderSourceHealth(value: unknown): GuestProviderSourceHealth | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (
+    !guestKinds.has(value.kind as DesktopGuestStatusKind) ||
+    !guestQualities.has(value.quality as GuestProviderSourceQuality) ||
+    !guestDiagnosticCodes.has(value.code as GuestProviderDiagnosticCode) ||
+    typeof value.safeToDisplay !== "boolean" ||
+    !isFiniteNumber(value.lastCheckedAt)
+  ) {
+    return undefined;
+  }
+
+  const sourceHealth: GuestProviderSourceHealth = {
+    kind: value.kind as DesktopGuestStatusKind,
+    quality: value.quality as GuestProviderSourceQuality,
+    code: value.code as GuestProviderDiagnosticCode,
+    safeToDisplay: value.safeToDisplay,
+    lastCheckedAt: value.lastCheckedAt,
+  };
+
+  return sourceHealth;
+}
+
+function parseMediaSessionStatus(value: unknown): TauriMediaSessionStatus | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (
+    typeof value.available !== "boolean" ||
+    !isMediaPlaybackStatus(value.playbackStatus) ||
+    !isFiniteNumber(value.progress) ||
+    !isMediaSessionCode(value.code) ||
+    !isFiniteNumber(value.checkedAt) ||
+    !isOptionalNumber(value.positionMs) ||
+    !isOptionalNumber(value.durationMs)
+  ) {
+    return undefined;
+  }
+
+  const positionMs = isFiniteNumber(value.positionMs) ? value.positionMs : undefined;
+  const durationMs = isFiniteNumber(value.durationMs) ? value.durationMs : undefined;
+
+  return {
+    available: value.available,
+    playbackStatus: value.playbackStatus,
+    progress: Math.max(0, Math.min(100, Math.round(value.progress))),
+    positionMs,
+    durationMs,
+    code: value.code,
+    checkedAt: value.checkedAt,
+  };
+}
+
+function isMediaPlaybackStatus(value: unknown): value is TauriMediaSessionStatus["playbackStatus"] {
+  return value === "playing" || value === "paused" || value === "unavailable" || value === "unsupported";
+}
+
+function isMediaSessionCode(value: unknown): value is TauriMediaSessionStatus["code"] {
+  return value === "available" || value === "not-playing" || value === "unsupported" || value === "provider-failed";
+}
+
 function isConfiguredShellWindow(value: unknown): value is TauriConfiguredShellWindow {
   if (!isRecord(value)) {
     return false;
@@ -354,35 +706,6 @@ function isConfiguredShellWindow(value: unknown): value is TauriConfiguredShellW
   );
 }
 
-function isHubEvent(value: unknown): value is HubEvent {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value.id === "string" &&
-    eventTypes.has(value.type as HubEventType) &&
-    eventSources.has(value.source as HubEventSource) &&
-    isFiniteNumber(value.createdAt) &&
-    isOptionalNumber(value.expiresAt) &&
-    isOptionalNumber(value.progress) &&
-    isOptionalRecord(value.payload) &&
-    isOptionalRecord(value.metadata)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isOptionalRecord(value: unknown): boolean {
-  return value === undefined || isRecord(value);
-}
-
-function isOptionalNumber(value: unknown): boolean {
-  return value === undefined || isFiniteNumber(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
+function isFinitePositiveNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value > 0;
 }

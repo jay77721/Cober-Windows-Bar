@@ -10,19 +10,19 @@ type ResidentStatusTemplateProps = {
 };
 
 export function ResidentStatusTemplate({ state }: ResidentStatusTemplateProps) {
+  const sourceLabel = sourceQualityLabel(state.sourceStatus?.quality);
+
   return (
     <>
       <div className="product-status-icon product-status-icon-resident" aria-hidden="true">
         <Cpu size={20} strokeWidth={2.2} />
-      </div>
-
-      <div className="product-status-resident-copy">
-        <span className="product-status-resident-eyebrow">System</span>
-        <strong>{state.title}</strong>
-        <span>{state.subtitle}</span>
-        <span className={`product-status-resident-health ${sourceQualityClassName(state.sourceStatus?.quality)}`}>
+        <span
+          className={`product-status-source-health ${sourceQualityClassName(state.sourceStatus?.quality)}`}
+          aria-label={`System status diagnostic source ${sourceLabel}`}
+          title={`Diagnostic source: ${sourceLabel}`}
+        >
           <span />
-          {sourceQualityLabel(state.sourceStatus?.quality)}
+          <span className="product-status-source-health-label">{sourceLabel}</span>
         </span>
       </div>
 

@@ -2,11 +2,15 @@ import { strict as assert } from "node:assert";
 import {
   emitTauriFixtureEvents,
   getTauriInvoke,
+  loadTauriGuestProviderCapabilities,
+  loadTauriMediaSessionStatus,
   loadTauriRuntimeCapabilities,
   loadTauriFixtureHubEvents,
   publishTauriFixtureEvents,
   TAURI_EMIT_FIXTURE_EVENTS_COMMAND,
   TAURI_FIXTURE_COMMAND,
+  TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND,
+  TAURI_MEDIA_SESSION_STATUS_COMMAND,
   TAURI_RUNTIME_CAPABILITIES_COMMAND,
   type TauriRuntimeDiagnostic,
   type TauriInvoke,
@@ -37,6 +41,44 @@ const canonicalRuntimeCapabilities = {
     centered: true,
   },
 } as const;
+
+const canonicalGuestProviderCapabilities = [
+  {
+    kind: "update",
+    quality: "app-owned",
+    code: "available",
+    safeToDisplay: true,
+    lastCheckedAt: 1_780_743_600_000,
+  },
+  {
+    kind: "focus",
+    quality: "unavailable",
+    code: "not-implemented",
+    safeToDisplay: false,
+    lastCheckedAt: 1_780_743_600_000,
+  },
+  {
+    kind: "media",
+    quality: "unavailable",
+    code: "not-implemented",
+    safeToDisplay: false,
+    lastCheckedAt: 1_780_743_600_000,
+  },
+  {
+    kind: "download",
+    quality: "unavailable",
+    code: "not-implemented",
+    safeToDisplay: false,
+    lastCheckedAt: 1_780_743_600_000,
+  },
+  {
+    kind: "clipboard",
+    quality: "unavailable",
+    code: "not-implemented",
+    safeToDisplay: false,
+    lastCheckedAt: 1_780_743_600_000,
+  },
+] as const;
 
 type SystemStatusRuntimePayloadFixture = {
   surface: "runtimeCapabilities";
@@ -752,6 +794,203 @@ test("current runtime capabilities do not expose future system status payload be
     assert.equal("implemented" in capabilities, false);
     assert.equal("production-capable" in capabilities, false);
   }
+});
+
+test("detects unavailable guest provider capability invoke", async () => {
+  const result = await loadTauriGuestProviderCapabilities({
+    invoke: undefined,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "unavailable");
+  assertDiagnosticContext(result.diagnostic, {
+    surface: "guestProviderCapabilities",
+    command: TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND,
+  });
+});
+
+test("loads canonical guest provider source health through the configured command", async () => {
+  const calls: string[] = [];
+  const result = await loadTauriGuestProviderCapabilities({
+    invoke: async (command) => {
+      calls.push(command);
+      return { providers: canonicalGuestProviderCapabilities };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND]);
+
+  if (result.ok) {
+    assert.deepEqual(result.sourceHealthByKind.update, canonicalGuestProviderCapabilities[0]);
+    assert.equal(result.sourceHealthByKind.update?.quality, "app-owned");
+    assert.equal(result.sourceHealthByKind.update?.safeToDisplay, true);
+    assert.equal(result.sourceHealthByKind.focus?.quality, "unavailable");
+    assert.equal(result.sourceHealthByKind.focus?.safeToDisplay, false);
+  }
+});
+
+test("returns malformed diagnostic for unsafe guest provider capability payloads", async () => {
+  const result = await loadTauriGuestProviderCapabilities({
+    invoke: async () => ({
+      providers: [
+        {
+          ...canonicalGuestProviderCapabilities[0],
+          path: "C:/Users/jay/private.txt",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.ok, true);
+
+  if (result.ok) {
+    assert.equal("path" in result.sourceHealthByKind.update!, false);
+  }
+
+  const malformed = await loadTauriGuestProviderCapabilities({
+    invoke: async () => ({
+      providers: [
+        {
+          ...canonicalGuestProviderCapabilities[0],
+          quality: "connected",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.diagnostic.code, "malformed");
+  assertDiagnosticContext(malformed.diagnostic, {
+    surface: "guestProviderCapabilities",
+    command: TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND,
+  });
+});
+
+test("maps guest provider capability timeout to unavailable source health", async () => {
+  const result = await loadTauriGuestProviderCapabilities({
+    invoke: async () => new Promise(() => {}),
+    timeoutMs: 1,
+  });
+
+  assert.equal(result.ok, true);
+
+  if (result.ok) {
+    assert.equal(result.sourceHealthByKind.update?.quality, "unavailable");
+    assert.equal(result.sourceHealthByKind.update?.code, "timeout");
+    assert.equal(result.sourceHealthByKind.update?.safeToDisplay, false);
+    assert.equal(result.sourceHealthByKind.clipboard?.code, "timeout");
+  }
+});
+
+test("returns invoke-failed diagnostic when guest provider capability command rejects", async () => {
+  const result = await loadTauriGuestProviderCapabilities({
+    invoke: async () => {
+      throw new Error("guest provider boundary failed");
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "invoke-failed");
+  assertDiagnosticContext(result.diagnostic, {
+    surface: "guestProviderCapabilities",
+    command: TAURI_GUEST_PROVIDER_CAPABILITIES_COMMAND,
+  });
+  assert.equal(result.diagnostic.detail, "guest provider boundary failed");
+});
+
+test("loads native media session status as a privacy-safe music event", async () => {
+  const calls: string[] = [];
+  const result = await loadTauriMediaSessionStatus({
+    invoke: async (command) => {
+      calls.push(command);
+      return {
+        available: true,
+        playbackStatus: "playing",
+        progress: 33.6,
+        positionMs: 65_000,
+        durationMs: 195_000,
+        code: "available",
+        checkedAt: 1_780_743_600_000,
+        title: "Private video title",
+        app: "Private browser",
+      };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [TAURI_MEDIA_SESSION_STATUS_COMMAND]);
+
+  if (result.ok) {
+    assert.equal(result.status.available, true);
+    assert.equal(result.status.progress, 34);
+    assert.equal(result.event?.type, "music");
+    assert.equal(result.event?.source, "music");
+    assert.equal(result.event?.payload?.title, "Media session");
+    assert.equal(result.event?.payload?.subtitle, "Playing");
+    assert.equal(result.event?.payload && "time" in result.event.payload ? result.event.payload.time : "", "1:05 / 3:15");
+    assert.equal(result.event?.metadata?.provider, "windows-media-session");
+    assert.equal(result.event?.metadata?.privacy, "coarse");
+    assert.equal("title" in result.status, false);
+    assert.equal("app" in result.status, false);
+  }
+});
+
+test("creates a privacy-safe media event when a native media session is paused", async () => {
+  const result = await loadTauriMediaSessionStatus({
+    invoke: async () => ({
+      available: true,
+      playbackStatus: "paused",
+      progress: 40,
+      code: "available",
+      checkedAt: 1_780_743_600_000,
+    }),
+  });
+
+  assert.equal(result.ok, true);
+
+  if (result.ok) {
+    assert.equal(result.event?.type, "music");
+    assert.equal(result.event?.payload?.title, "Media session");
+    assert.equal(result.event?.payload?.subtitle, "Media ready");
+  }
+});
+
+test("does not create a media event when native media is unavailable", async () => {
+  const result = await loadTauriMediaSessionStatus({
+    invoke: async () => ({
+      available: false,
+      playbackStatus: "unavailable",
+      progress: 0,
+      code: "provider-failed",
+      checkedAt: 1_780_743_600_000,
+    }),
+  });
+
+  assert.equal(result.ok, true);
+
+  if (result.ok) {
+    assert.equal(result.event, undefined);
+  }
+});
+
+test("returns malformed diagnostic for invalid native media session payloads", async () => {
+  const result = await loadTauriMediaSessionStatus({
+    invoke: async () => ({
+      available: true,
+      playbackStatus: "connected",
+      progress: 42,
+      code: "available",
+      checkedAt: 1_780_743_600_000,
+    }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.diagnostic.code, "malformed");
+  assertDiagnosticContext(result.diagnostic, {
+    surface: "mediaSession",
+    command: TAURI_MEDIA_SESSION_STATUS_COMMAND,
+  });
 });
 
 for (const { name, run } of tests) {

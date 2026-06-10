@@ -98,7 +98,7 @@ Start here:
 - `src/runtime/systemPerformanceRuntime.ts`
 - `src/runtime/systemPerformanceRuntime.test.ts`
 
-Current boundary: v0.8 system status work is readiness/preflight only. It defines privacy-safe diagnostics, source-health UI feedback, and tests. It does not implement a real Windows system status provider, Windows API calls, provider lifecycle behavior, runtime-provider wiring, or a `windowsProviders` transition.
+Current boundary: v0.8 system status work has moved beyond preflight. The Tauri Rust backend now provides real system performance data (CPU/RAM/network via sysinfo crate) and real media session tracking (via Windows GSMTC). The remaining v0.8 work focuses on wrapping these data sources into the Provider SDK lifecycle and adding the remaining native providers (focus, clipboard, downloads, notifications).
 
 ### I want to work on the desktop status center
 

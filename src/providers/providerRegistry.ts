@@ -6,7 +6,7 @@ import type {
   HubProviderStatus,
 } from "./types";
 
-export type ProviderRegistryRecord = {
+type ProviderRegistryRecord = {
   id: string;
   name: string;
   kind: HubProviderKind;
@@ -16,7 +16,7 @@ export type ProviderRegistryRecord = {
   registrationOrder: number;
 };
 
-export type ProviderRegistryRegisterResult =
+type ProviderRegistryRegisterResult =
   | {
       ok: true;
       record: ProviderRegistryRecord;
@@ -27,7 +27,7 @@ export type ProviderRegistryRegisterResult =
       id: string;
     };
 
-export type ProviderRegistryCapabilitySupportRecord = {
+type ProviderRegistryCapabilitySupportRecord = {
   providerId: string;
   providerName: string;
   providerKind: HubProviderKind;
@@ -35,7 +35,7 @@ export type ProviderRegistryCapabilitySupportRecord = {
   capability: HubProviderCapability;
 };
 
-export type ProviderRegistryCapabilitySupportSummary = {
+type ProviderRegistryCapabilitySupportSummary = {
   kind: HubProviderCapability["kind"];
   origin: HubProviderCapability["origin"];
   support: HubProviderCapability["support"];

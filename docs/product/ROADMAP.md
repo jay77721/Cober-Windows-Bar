@@ -101,62 +101,66 @@ Out of scope for v0.5:
 - Real provider implementations
 - Showcase visual redesign
 
-## Stage 4: Tauri Spike
+## Stage 4: Tauri Desktop Shell
 
-Goal: freeze and prove the shell/runtime/IPC boundary before any real provider work.
+Goal: prove and deliver the desktop shell, runtime, and IPC boundary.
 
 Target: v0.7.
 
-Status: v0.7 boundary proof and diagnostics are closed as mock/fixture-only work. The landed slices prove fixture IPC, runtime capability diagnostics, provider capability support facts, registry diagnostic summaries, and runtime/provider diagnostic compatibility without adding real native providers.
+Status: **done.** The Tauri shell, runtime, and IPC boundary have been fully integrated. This significantly exceeded the original spike goal and delivered a working desktop application.
 
-Scope:
+Delivered:
 
-- Tauri shell/runtime scope planning and spike gate
-- Shell needs: transparent or acrylic-feeling window, right-bottom docking, startup behavior, and always-on-top behavior
-- IPC boundary shape for canonical mock or fixture HubEvents
-- Proof that mocked events can still flow through Event Bus -> Store -> Resolver -> Hub UI
-- Failure and diagnostic expectations when the native boundary is unavailable or malformed
-- Runtime capability facts that keep `windowsProviders`, tray, and always-on-top reported as `false`
-- Provider capability facts that can represent mock `available` capabilities and native/music `preflight` diagnostics
-- Read-only provider registry diagnostics through `listCapabilitySupport()` and `summarizeCapabilitySupport()`
+- Tauri 2 application shell with `src-tauri/src/lib.rs` (1226 lines of Rust)
+- Real system performance metrics via `sysinfo` crate (CPU, memory, network)
+- Windows Media Session integration via WinRT GSMTC API (playback status, position, duration)
+- Foreground fullscreen detection via Win32 APIs (`GetForegroundWindow`, `GetWindowRect`, `MonitorFromWindow`)
+- Window Z-order management (`HWND_TOPMOST`/`HWND_BOTTOM` via `SetWindowPos`)
+- `WS_EX_TOOLWINDOW` style (hidden from taskbar)
+- System tray icon with context menu (show/settings/quit)
+- Global hotkey `Alt+Shift+Space` for window recall
+- Preferences persistence (JSON file in app config dir)
+- Window drag via Tauri `start_dragging()`
+- Multi-monitor position correction with work area clamping
+- DPI scale change handling with debounced correction
+- Hub event fixture stream for IPC boundary proof
+- Guest provider capability reporting (media as native, others as unavailable)
+- Frontend runtime bridge layer with Tauri IPC detection and graceful mock fallback
+- Diagnostic error classification (unavailable, invoke-failed, malformed, timeout, permission-denied)
+- Desktop product runtime with menu action, settings, and open-settings event listeners
+- Desktop status input runtime with three-tier source: mock → tauri-fixture → tauri-event push
+- System performance runtime with live/fallback/stale/unavailable quality tracking
+- Status window overlay runtime with floating policy, fullscreen avoidance, and startup reassert
 
-Non-goals:
+## Stage 5: First Real Providers
 
-- Real providers or Windows APIs
-- Broad Rust module design
-- Production packaging polish
-- UI redesign
-- Store, Resolver, provider lifecycle, runtime-provider wiring, or native provider expansion
+Goal: connect real system data through the provider SDK lifecycle.
 
-## Stage 5: First Real Provider
+Target: v0.8 or later.
 
-Goal: connect real system data for the first time.
+Status: **in progress.** System performance and media session data already flow end-to-end from Rust through Tauri IPC to the frontend runtime layer. The next step is wrapping these into the Provider SDK lifecycle (start/stop/health) so they integrate through the provider registry and adapter rather than bypassing it.
 
-Target: v0.8 or later, after the Tauri shell/runtime boundary is proven.
+What is real today:
 
-Status: v0.8 system status readiness/preflight work has landed. It prepares privacy-safe diagnostics, source-health UI feedback, and tests only. It does not connect real Windows APIs, add a Rust metrics reader, export a real provider, collect private system data, or change `windowsProviders: false`.
+- CPU, memory, and network metrics from `sysinfo` crate, displayed in `ResidentStatusTemplate`
+- Windows Media Session (GSMTC) playback status in `MediaStatusTemplate`
+- Full frontend polling loop (every 1800ms) with graceful fallback to mock data
+- Provider health monitoring via `GuestProviderSourceHealth` in UI
 
-Stage 5 must continue from the v0.7/v0.8 diagnostic baseline: runtime `windowsProviders` remains `false`, and provider `origin: "native"` / `support: "preflight"` facts are not working native provider implementations.
+What remains:
 
-Priority:
-
-1. System status native/runtime/provider path planning gate
-2. System information and music status only after separate implementation approval
-3. System notifications without reading private message content
-4. Downloads folder/file-change status
-
-Candidate sources:
-
-- CPU, RAM, network
-- Windows Media Session-compatible apps
-- Windows notification center
-- Downloads directory watcher
+- Wrap system performance and media session as `HubProvider` implementations registered in `ProviderRegistry`
+- Remove direct polling from `DesktopPage.tsx`, route through provider adapter → event bus → store → resolver
+- Focus mode provider (Windows Focus Assist API)
+- Clipboard watcher provider (Windows `AddClipboardFormatListener`)
+- Download watcher provider (file system monitor or browser integration)
+- Notification provider (Windows Notification Listener API)
 
 ## Stage 6: Developer Hub
 
 Goal: become a daily developer status center.
 
-Target: v0.9 or later.
+Target: v0.9 or later, after core providers are stable.
 
 Candidate surfaces:
 
@@ -186,4 +190,4 @@ This stage turns the product from a notification surface into a unified status l
 
 ## Product Principle
 
-Prefer clear status flow over early real-data breadth. A beautiful, understandable event-driven playground proves the architecture better than a half-integrated provider stack with confusing state transitions.
+Prefer clear status flow over early real-data breadth. The mock event playground and provider SDK established the architecture. The Tauri shell and first real providers (system performance, media session) have validated the runtime boundary. Future providers must follow the same pattern: normalize into `HubEvent` through the provider adapter, flow through the event bus, store, and resolver, and render without the UI knowing the data source.

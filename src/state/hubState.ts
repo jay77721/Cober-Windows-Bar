@@ -1,3 +1,4 @@
+import { clampProgress, snapshotHubEvent } from "../shared/runtimeGuards";
 import type { HubEvent, HubMode, HubStoreState, HubTask } from "../types/hub";
 
 const taskAccentMap = {
@@ -7,7 +8,6 @@ const taskAccentMap = {
   notification: "cyan",
 } as const;
 
-const clampProgress = (value: number) => (Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 0);
 const isFiniteNumber = (value: number | undefined) => typeof value === "number" && Number.isFinite(value);
 
 export function getActiveHubEvents(events: HubEvent[], now = Date.now()) {
@@ -18,14 +18,6 @@ export function getActiveHubEvents(events: HubEvent[], now = Date.now()) {
         (event.expiresAt === undefined || (isFiniteNumber(event.expiresAt) && event.expiresAt > now)),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-function snapshotHubEvent(event: HubEvent): HubEvent {
-  return {
-    ...event,
-    payload: event.payload ? { ...event.payload } : undefined,
-    metadata: event.metadata ? { ...event.metadata } : undefined,
-  };
 }
 
 export function resolveHubMode(events: HubEvent[], now = Date.now()): HubMode {
@@ -58,7 +50,7 @@ export function resolveHubMode(events: HubEvent[], now = Date.now()): HubMode {
   return event.type;
 }
 
-export function eventToTask(event: HubEvent): HubTask {
+function eventToTask(event: HubEvent): HubTask {
   const payload = event.payload && "title" in event.payload ? event.payload : undefined;
   const shouldDefaultProgress = event.type === "ai" || event.type === "download";
 

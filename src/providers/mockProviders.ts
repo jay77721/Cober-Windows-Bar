@@ -1,3 +1,4 @@
+import { snapshotHubEvent } from "../shared/runtimeGuards";
 import type { HubEvent } from "../types/hub";
 import type {
   HubProvider,
@@ -24,14 +25,6 @@ const resolveNow = (options: MockProviderOptions = {}) => {
 
 const createEventId = (providerId: string, type: HubEvent["type"], timestamp: number) =>
   `${providerId}-${type}-${timestamp}`;
-
-function snapshotHubEvent(event: HubEvent): HubEvent {
-  return {
-    ...event,
-    payload: event.payload ? { ...event.payload } : undefined,
-    metadata: event.metadata ? { ...event.metadata } : undefined,
-  };
-}
 
 export const createMockMusicEvent = (options: MockProviderOptions = {}): HubEvent => {
   const createdAt = resolveNow(options);
@@ -211,10 +204,3 @@ export const createMockNotificationProvider = (options: MockProviderOptions = {}
     capabilities: createMockCapabilities("notification"),
     events: () => [createMockNotificationEvent(options)],
   });
-
-export const createMockProviders = () => [
-  createMockMusicProvider(),
-  createMockDownloadProvider(),
-  createMockAIProvider(),
-  createMockNotificationProvider(),
-];

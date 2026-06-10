@@ -10,7 +10,7 @@ export type HubDemoScenarioId =
   | "notification"
   | "multiTask";
 
-export type HubDemoScenario = {
+type HubDemoScenario = {
   id: HubDemoScenarioId;
   label: string;
   caption: string;
@@ -29,7 +29,7 @@ function eventDefaults(now: number) {
   };
 }
 
-export function createMusicDemoEvent(now = Date.now()): HubEvent {
+function createMusicDemoEvent(now = Date.now()): HubEvent {
   return {
     ...eventDefaults(now),
     id: "demo-music",
@@ -44,7 +44,7 @@ export function createMusicDemoEvent(now = Date.now()): HubEvent {
   };
 }
 
-export function createAiDemoEvent(now = Date.now()): HubEvent {
+function createAiDemoEvent(now = Date.now()): HubEvent {
   return {
     ...eventDefaults(now),
     id: "demo-ai",
@@ -61,7 +61,7 @@ export function createAiDemoEvent(now = Date.now()): HubEvent {
   };
 }
 
-export function createDownloadDemoEvent(now = Date.now()): HubEvent {
+function createDownloadDemoEvent(now = Date.now()): HubEvent {
   return {
     ...eventDefaults(now),
     id: "demo-download",
@@ -78,7 +78,7 @@ export function createDownloadDemoEvent(now = Date.now()): HubEvent {
   };
 }
 
-export function createNotificationDemoEvent(now = Date.now()): HubEvent {
+function createNotificationDemoEvent(now = Date.now()): HubEvent {
   return {
     ...eventDefaults(now),
     id: "demo-notification",
@@ -92,7 +92,7 @@ export function createNotificationDemoEvent(now = Date.now()): HubEvent {
   };
 }
 
-export function createMultiTaskDemoEvents(now = Date.now()): HubEvent[] {
+function createMultiTaskDemoEvents(now = Date.now()): HubEvent[] {
   return [
     createDownloadDemoEvent(now),
     createAiDemoEvent(now - 120),

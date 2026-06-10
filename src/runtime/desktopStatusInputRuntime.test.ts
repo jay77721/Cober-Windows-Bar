@@ -53,6 +53,22 @@ async function testLoadsFixtureEventsFromTauriInvoke() {
   assert.notEqual(result.events, fixtureEvents);
 }
 
+async function testSkipsFixtureLoadWhenDisabled() {
+  let invokeCalls = 0;
+  const result = await loadDesktopStatusEvents({
+    fallbackEvents: [],
+    loadFixtureEvents: false,
+    invoke: async () => {
+      invokeCalls += 1;
+      return fixtureEvents;
+    },
+  });
+
+  assert.equal(invokeCalls, 0);
+  assert.equal(result.source, "mock");
+  assert.deepEqual(result.events, []);
+}
+
 async function testFallsBackToMockWhenFixtureLoadFails() {
   const result = await loadDesktopStatusEvents({
     invoke: async () => {
@@ -66,6 +82,33 @@ async function testFallsBackToMockWhenFixtureLoadFails() {
     mockHubEvents,
   );
   assert.equal(result.diagnostic?.code, "invoke-failed");
+}
+
+async function testDesktopStatusRuntimeCanStartFromResidentProductInput() {
+  let invokeCalls = 0;
+  const runtime = createDesktopStatusRuntime({
+    fallbackEvents: [],
+    loadFixtureEvents: false,
+    invoke: async () => {
+      invokeCalls += 1;
+      return fixtureEvents;
+    },
+  });
+
+  const initialSnapshot = runtime.getSnapshot();
+  assert.equal(initialSnapshot.source, "mock");
+  assert.equal(initialSnapshot.sourceStatus.activeSource, "mock");
+  assert.equal(initialSnapshot.sourceStatus.quality, "fallback");
+  assert.deepEqual(initialSnapshot.state.events, []);
+
+  const refreshedSnapshot = await runtime.refresh();
+  assert.equal(invokeCalls, 0);
+  assert.equal(refreshedSnapshot.source, "mock");
+  assert.equal(refreshedSnapshot.sourceStatus.activeSource, "mock");
+  assert.equal(refreshedSnapshot.sourceStatus.quality, "fallback");
+  assert.deepEqual(refreshedSnapshot.state.events, []);
+
+  runtime.dispose();
 }
 
 async function testDesktopStatusRuntimeSeedsBusAndRefreshesFromFixtureSource() {
@@ -334,7 +377,9 @@ async function testDesktopStatusRuntimeUsesTauriEventSourceAndUnlistensOnDispose
 
 await testFallsBackToMockWithoutInvoke();
 await testLoadsFixtureEventsFromTauriInvoke();
+await testSkipsFixtureLoadWhenDisabled();
 await testFallsBackToMockWhenFixtureLoadFails();
+await testDesktopStatusRuntimeCanStartFromResidentProductInput();
 await testDesktopStatusRuntimeSeedsBusAndRefreshesFromFixtureSource();
 await testDesktopStatusRuntimeSubscribersReceiveBusUpdates();
 await testDesktopStatusRuntimeAcceptsPushListenerUpdates();

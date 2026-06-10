@@ -9,7 +9,7 @@ import type {
   SystemPerformanceSourceStatus,
 } from "../types/hub";
 
-export const DESKTOP_STATUS_DEFAULT_KIND: DesktopStatusKind = "resident";
+const DESKTOP_STATUS_DEFAULT_KIND: DesktopStatusKind = "resident";
 
 function cloneMetrics(metrics: SystemPerformanceMetric[]): SystemPerformanceMetric[] {
   return metrics.map((metric) => ({ ...metric }));

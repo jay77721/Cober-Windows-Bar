@@ -2,6 +2,7 @@ import { Music4 } from "lucide-react";
 import { getDesktopStatusTemplateChromeCopy } from "../../../data/desktopStatusConfig";
 import type { DesktopMediaState } from "../../../types/hub";
 import { DesktopStatusTemplateFrame } from "./DesktopStatusTemplateFrame";
+import { GuestSourceHealthIndicator } from "./GuestSourceHealthIndicator";
 
 type MediaStatusTemplateProps = {
   state: DesktopMediaState;
@@ -14,6 +15,7 @@ export function MediaStatusTemplate({ state }: MediaStatusTemplateProps) {
     <>
       <div className="product-status-icon product-status-icon-media" aria-hidden="true">
         <Music4 size={18} strokeWidth={2.1} />
+        <GuestSourceHealthIndicator sourceHealth={state.sourceHealth} />
       </div>
       <DesktopStatusTemplateFrame
         eyebrow={copy.mediaEyebrow}

@@ -1,6 +1,6 @@
 # Provider Registry
 
-Status: v0.7 diagnostic alignment. This document began as v0.5.0 planning for the Mock Provider SDK; the current project now includes a narrow local registry plus read-only capability diagnostic read models. It still does not define runtime wiring, IPC, Tauri commands, Windows APIs, real providers, or concrete native provider behavior.
+Status: v0.7 diagnostic alignment (updated for v0.8 progress). This document began as v0.5.0 planning for the Mock Provider SDK; the current project now includes a narrow local registry plus read-only capability diagnostic read models. The Tauri Rust backend now implements real Windows API integration (system performance, media session, window management, tray), documented in `docs/architecture/TAURI_STRATEGY.md`. This registry document's scope remains the registry abstraction layer and does not define runtime wiring, IPC, Tauri commands, Windows APIs, real providers, or concrete native provider behavior.
 
 ## Purpose
 

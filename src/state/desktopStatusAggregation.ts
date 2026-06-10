@@ -1,3 +1,4 @@
+import { clampProgress, dedupeKinds } from "../shared/runtimeGuards";
 import { createHubStoreState, getActiveHubEvents } from "./hubState";
 import type {
   DesktopClipboardState,
@@ -24,17 +25,6 @@ const DESKTOP_STATUS_AVAILABLE_KINDS: DesktopStatusKind[] = [
   "focus",
 ];
 
-function dedupeKinds(kinds: DesktopStatusKind[]): DesktopStatusKind[] {
-  return kinds.filter((kind, index) => kinds.indexOf(kind) === index);
-}
-
-function clampProgress(value: number | undefined, fallback = 0): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return Math.max(0, Math.min(100, value));
-}
 
 function normalizeAvailableKinds(kinds: DesktopStatusKind[] | undefined): DesktopStatusKind[] | undefined {
   if (!kinds?.length) {
