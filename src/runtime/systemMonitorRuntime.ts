@@ -32,6 +32,8 @@ export type MediaSessionChangedPayload = {
   progress: number;
   positionMs?: number;
   durationMs?: number;
+  title?: string;
+  artist?: string;
   code: string;
   checkedAt: number;
 };

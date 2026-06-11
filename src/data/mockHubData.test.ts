@@ -1,5 +1,9 @@
 import { strict as assert } from "node:assert";
 import i18n from "../i18n";
+
+// Set language BEFORE any module that calls i18n.t() at load time
+i18n.changeLanguage("zh-CN");
+
 import {
   getDesktopStatusTemplateDescriptors,
   createDesktopStatusStateTemplates,
@@ -10,10 +14,7 @@ import {
 } from "./desktopStatusConfig";
 import { systemPerformanceMetrics } from "./mockHubData";
 
-// Ensure Chinese for predictable test labels
-i18n.changeLanguage("zh-CN");
-
-const mojibakePattern = /[\uFFFD\u951F\u4fd9\u7ca8\u93c9\u3128\u6d63\u51aa\u5f42\u6d63\u9903\u5890\u6577]/;
+const mojibakePattern = /[\uFFFD\u951F\u4fd9\u7ca8\u93c9\u3128\u6d63\u51aa\u5f42\u9903\u5890\u6577]/;
 
 const metricLabels = Object.fromEntries(
   systemPerformanceMetrics.map((metric) => [metric.id, metric.label]),
