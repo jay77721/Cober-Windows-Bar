@@ -931,8 +931,9 @@ test("loads native media session status as a privacy-safe music event", async ()
     assert.equal(result.event?.payload && "time" in result.event.payload ? result.event.payload.time : "", "1:05 / 3:15");
     assert.equal(result.event?.metadata?.provider, "windows-media-session");
     assert.equal(result.event?.metadata?.privacy, "coarse");
-    assert.equal("title" in result.status, false);
-    assert.equal("app" in result.status, false);
+    // event.payload is privacy-safe: it never carries the real media title
+    assert.equal("title" in (result.event?.payload ?? {}), false);
+    assert.equal("app" in (result.event?.payload ?? {}), false);
   }
 });
 

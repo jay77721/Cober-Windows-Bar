@@ -22,6 +22,7 @@ import { DESKTOP_STATUS_TEMPLATE_ORDER } from "../../../data/desktopStatusConfig
 import { createHubEventBus } from "../../../state/hubState";
 import { createProviderManager, type ProviderManager } from "../../../providers/providerManager";
 import { onMediaSessionChanged, type MediaSessionChangedPayload } from "../../../runtime/systemMonitorRuntime";
+import { loadTauriMediaSessionStatus } from "../../../runtime/tauriRuntime";
 import { MEDIA_DISPLAY_WINDOW_MS, formatMediaTime } from "../../../shared/mediaTime";
 
 export type UseDesktopStatusRuntimeResult = {
@@ -83,6 +84,8 @@ function mediaPayloadToHubEvent(payload: MediaSessionChangedPayload): HubEvent {
       progress: payload.progress,
       positionMs: payload.positionMs,
       durationMs: payload.durationMs,
+      title: payload.title,
+      artist: payload.artist,
     },
     metadata: {
       timeLabel: formatMediaTime(payload.positionMs, payload.durationMs),
@@ -106,7 +109,7 @@ export function useDesktopStatusRuntime(
   if (!managerRef.current) {
     managerRef.current = createProviderManager(busRef.current, {
       realProviders: true,
-      mockProviders: true,
+      mockProviders: false,
     });
   }
 
@@ -119,9 +122,9 @@ export function useDesktopStatusRuntime(
   const activatedAtByKindRef = useRef<Partial<Record<DesktopStatusKind, number>>>({});
 
   // Clipboard auto-expiry: revert to resident after 5 seconds
-  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const clipboardExpiredRef = useRef(false);
-  const prevClipboardCopiedAtRef = useRef<number | undefined>();
+  const prevClipboardCopiedAtRef = useRef<number | undefined>(undefined);
   const [, setClipboardTick] = useState(0);
 
   // Subscribe to runtime changes + initial refresh (legacy pipeline for hub events)
@@ -144,16 +147,44 @@ export function useDesktopStatusRuntime(
   useEffect(() => {
     let unlisten: (() => void) | undefined;
 
-    onMediaSessionChanged((payload) => {
+    const handleMediaPayload = (payload: MediaSessionChangedPayload) => {
+      console.log("[media-debug] handleMediaPayload received:", JSON.stringify(payload));
       const mediaEvent = mediaPayloadToHubEvent(payload);
+      console.log("[media-debug] converted to HubEvent:", JSON.stringify(mediaEvent));
       setHubState((prev) => ({
         ...prev,
         events: [mediaEvent, ...prev.events.filter((e) => e.id !== mediaEvent.id)],
       }));
-    }).then((fn) => {
-      unlisten = fn;
+    };
+
+    // Fetch initial media state on mount so we don't wait for the next change event
+    console.log("[media-debug] Fetching initial media state...");
+    loadTauriMediaSessionStatus().then((result) => {
+      console.log("[media-debug] Initial media state result:", JSON.stringify(result));
+      if (result.ok && result.status) {
+        handleMediaPayload({
+          available: result.status.available,
+          playbackStatus: result.status.playbackStatus,
+          progress: result.status.progress,
+          positionMs: result.status.positionMs,
+          durationMs: result.status.durationMs,
+          title: result.status.title,
+          artist: result.status.artist,
+          code: result.status.code,
+          checkedAt: result.status.checkedAt,
+        });
+      }
     }).catch(() => {
+      // Initial fetch failed — non-critical, listener will catch future changes
+    });
+
+    console.log("[media-debug] Registering media session listener...");
+    onMediaSessionChanged(handleMediaPayload).then((fn) => {
+      console.log("[media-debug] Media session listener registered successfully");
+      unlisten = fn;
+    }).catch((err) => {
       // Media session listener not available — non-critical
+      console.error("[media-debug] Failed to register media listener:", err);
     });
 
     return () => {
