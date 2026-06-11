@@ -68,7 +68,7 @@ function systemPayloadToMetrics(payload: SystemPerformancePayload): SystemPerfor
 
 function mediaPayloadToHubEvent(payload: MediaSessionChangedPayload): HubEvent {
   const createdAt = payload.checkedAt || Date.now();
-  const expiresAt = payload.playbackStatus === "playing"
+  const expiresAt = payload.available
     ? createdAt + MEDIA_DISPLAY_WINDOW_MS
     : createdAt;
 

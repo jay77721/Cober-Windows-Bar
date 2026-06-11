@@ -196,7 +196,7 @@ function deriveStateOverrides(hubState: HubStoreState): Partial<DesktopStatusSta
   const mediaEvent = hubState.events.find((event) => event.type === "media");
   if (mediaEvent && mediaEvent.payload && "playbackStatus" in mediaEvent.payload) {
     const payload = mediaEvent.payload as MediaSessionPayload;
-    if (payload.available && payload.playbackStatus === "playing") {
+    if (payload.available) {
       overrides.media = snapshotRealMediaState(payload, mediaEvent.metadata);
     }
   }
@@ -260,8 +260,8 @@ function deriveActiveKinds(hubState: HubStoreState, events: HubEvent[]): Desktop
   if (events.some((event) => {
     if (event.type !== "media") return false;
     const payload = event.payload;
-    const isPlaying = payload && "playbackStatus" in payload && (payload as MediaSessionPayload).playbackStatus === "playing";
-    return isPlaying;
+    const isAvailable = payload && "available" in payload && (payload as MediaSessionPayload).available;
+    return isAvailable;
   })) {
     activeKinds.push("media");
   }
