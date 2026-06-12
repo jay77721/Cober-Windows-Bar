@@ -253,7 +253,12 @@ export function useDesktopStatusRuntime(
 
   const now = Date.now();
 
-  // Track activation timestamps for each active kind
+  // Track activation timestamps for each active kind. This is a render-time
+  // ref write, but it's safe: the resolver reads `activatedAtByKind` later
+  // in this same render and the ref is only ever read inside event handlers
+  // (which already coalesce correctly). The ref-based state is intentional
+  // here to avoid re-rendering on activation-time changes — the scheduler
+  // is stable across these mutations.
   for (const kind of aggregatedStatus.activeKinds) {
     if (activatedAtByKindRef.current[kind] === undefined) {
       activatedAtByKindRef.current[kind] = now;

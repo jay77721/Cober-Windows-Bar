@@ -98,10 +98,13 @@ export function SettingsPanel({
   onClose,
 }: SettingsPanelProps) {
   const { t, i18n: i18nInstance } = useTranslation();
-  const settingsCopy = getDesktopStatusSettingsCopy();
+  const settingsCopy = useMemo(
+    () => getDesktopStatusSettingsCopy(),
+    [i18nInstance.language, t],
+  );
   const templateDescriptors = useMemo(
     () => getDesktopStatusTemplateDescriptors(),
-    [i18nInstance.language],
+    [i18nInstance.language, t],
   );
 
   return (

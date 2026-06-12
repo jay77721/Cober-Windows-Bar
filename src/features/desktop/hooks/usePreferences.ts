@@ -39,14 +39,19 @@ export function usePreferences(): UsePreferencesResult {
 
   const updatePreferences = useCallback(
     async (patch: Partial<DesktopStatusPreferences>) => {
+      // Capture the merged value here so the IPC call below uses the SAME
+      // value the local state updater just committed. The previous
+      // implementation read `preferences` from a closure that could lag
+      // one render behind the setState call, and dispatched the IPC with
+      // a stale snapshot when the user double-clicked a toggle quickly.
+      let nextValue: DesktopStatusPreferences = preferences;
       setPreferences((prev) => {
-        const nextValue = { ...prev, ...patch };
+        nextValue = { ...prev, ...patch };
         return nextValue;
       });
 
       const invoke = getTauriInvoke();
       if (invoke) {
-        const nextValue = { ...preferences, ...patch };
         await invoke(SET_STATUS_CENTER_PREFERENCES_COMMAND, {
           preferences: nextValue,
         });

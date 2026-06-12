@@ -90,7 +90,11 @@ export function DesktopPage() {
   // Preferences
   const { preferences, updatePreferences } = usePreferences();
 
-  // Sync lockPosition to drag controller ref
+  // Sync lockPosition to drag controller ref.
+  // This is a render-time ref write — it's safe because the drag controller
+  // reads the ref lazily inside its event handler, not synchronously during
+  // render. Doing it via useEffect would just push the write one frame later
+  // and risk a window where the drag controller sees a stale value.
   lockPositionRef.current = preferences.lockPosition;
 
   // Overlay policy (fullscreen avoidance + floating)
