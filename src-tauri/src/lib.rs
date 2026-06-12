@@ -1,8 +1,11 @@
-﻿use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+mod types;
+pub use crate::types::*;
+
+// (Deserialize/Serialize re-exported via types)
+use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::{Networks, System};
@@ -51,24 +54,6 @@ use windows::Media::Control::{
 };
 
 #[cfg(windows)]
-use std::sync::mpsc as std_mpsc;
-
-/// Request types sent to the MTA media thread.
-/// All WinRT async calls run on this thread; the MTA apartment lets the
-/// thread pool signal async completions without a dedicated message pump.
-#[cfg(windows)]
-enum MediaRequest {
-  Read(std_mpsc::Sender<MediaSessionStatus>),
-  Action(String, std_mpsc::Sender<Result<MediaControlResult, String>>),
-}
-
-/// Channel sender for routing requests to the STA media thread.
-#[cfg(windows)]
-type MediaRequestSender = Arc<Mutex<std_mpsc::Sender<MediaRequest>>>;
-
-/// How often the media refresh timer re-publishes a playing session so the
-/// frontend expiry window (30s) is never breached by silence.
-const MEDIA_REFRESH_INTERVAL: Duration = Duration::from_secs(20);
 
 /// Spawns a dedicated MTA (Multi-Threaded Apartment) thread for WinRT media calls.
 ///
@@ -90,6 +75,7 @@ fn start_mta_media_thread(
   use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
   use windows_sys::Win32::System::Com::CoInitializeEx;
   use windows_sys::Win32::System::Com::COINIT_MULTITHREADED;
+  use std::sync::mpsc as std_mpsc;
 
   let (request_tx, request_rx) = std_mpsc::channel::<MediaRequest>();
   let sender: MediaRequestSender = Arc::new(Mutex::new(request_tx));
@@ -265,218 +251,6 @@ const GLOBAL_SHORTCUT_RECALL: &str = "Alt+Shift+Space";
 const STATUS_WINDOW_CONFIGURED_WIDTH: u16 = 303;
 const STATUS_WINDOW_CONFIGURED_HEIGHT: u16 = 64;
 
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DesktopStatusPreferences {
-  always_float: bool,
-  avoid_fullscreen: bool,
-  lock_position: bool,
-}
-
-impl Default for DesktopStatusPreferences {
-  fn default() -> Self {
-    Self {
-      always_float: true,
-      avoid_fullscreen: true,
-      lock_position: false,
-    }
-  }
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StatusCenterSettingsPayload {
-  preferences: DesktopStatusPreferences,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StatusCenterOpenSettingsPayload {
-  source: &'static str,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StatusCenterMenuActionPayload {
-  action: &'static str,
-  checked: Option<bool>,
-}
-
-struct StatusCenterMenuItems<R: tauri::Runtime> {
-  menu: Menu<R>,
-  always_float: tauri::menu::CheckMenuItem<R>,
-  avoid_fullscreen: tauri::menu::CheckMenuItem<R>,
-  lock_position: tauri::menu::CheckMenuItem<R>,
-}
-
-struct NetworkSample {
-  received_bytes: u64,
-  transmitted_bytes: u64,
-  sampled_at: std::time::Instant,
-}
-
-struct SystemPerformanceCache {
-  networks: Option<Networks>,
-  network_sample: Option<NetworkSample>,
-}
-
-impl Default for SystemPerformanceCache {
-  fn default() -> Self {
-    Self {
-      networks: None,
-      network_sample: None,
-    }
-  }
-}
-
-struct DesktopProductState<R: tauri::Runtime> {
-  preferences: DesktopStatusPreferences,
-  menu_items: Option<StatusCenterMenuItems<R>>,
-  perf_cache: SystemPerformanceCache,
-}
-
-impl<R: tauri::Runtime> Default for DesktopProductState<R> {
-  fn default() -> Self {
-    Self {
-      preferences: DesktopStatusPreferences::default(),
-      menu_items: None,
-      perf_cache: SystemPerformanceCache::default(),
-    }
-  }
-}
-
-type SharedDesktopProductState<R> = Arc<Mutex<DesktopProductState<R>>>;
-
-// MediaRequest and MediaRequestSender are defined above (cfg(windows) gated).
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HubEventFixture {
-  id: String,
-  #[serde(rename = "type")]
-  event_type: String,
-  source: String,
-  created_at: u64,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  expires_at: Option<u64>,
-  progress: Option<u8>,
-  payload: Value,
-  metadata: Value,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StatusCenterHubEventsPayload {
-  events: Vec<HubEventFixture>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RuntimeCapabilities {
-  runtime: String,
-  fixture_ipc: bool,
-  tray: bool,
-  always_on_top: bool,
-  windows_providers: bool,
-  configured_shell_window: ConfiguredShellWindow,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GuestProviderCapability {
-  kind: &'static str,
-  quality: &'static str,
-  code: &'static str,
-  safe_to_display: bool,
-  last_checked_at: u64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GuestProviderCapabilitiesPayload {
-  providers: Vec<GuestProviderCapability>,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MediaSessionStatus {
-  available: bool,
-  playback_status: &'static str,
-  progress: u8,
-  position_ms: Option<u64>,
-  duration_ms: Option<u64>,
-  title: String,
-  artist: String,
-  code: &'static str,
-  checked_at: u64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ConfiguredShellWindow {
-  configured: bool,
-  title: String,
-  width: u16,
-  height: u16,
-  min_width: u16,
-  min_height: u16,
-  resizable: bool,
-  centered: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SystemPerformanceSnapshot {
-  cpu: u8,
-  memory: u8,
-  download_speed: u64,
-  upload_speed: u64,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ClipboardContent {
-  text: String,
-  source_app: String,
-  copied_at: u64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MediaControlResult {
-  success: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OverlayPolicy {
-  foreground_fullscreen: bool,
-  should_float: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WindowPositionCorrection {
-  corrected: bool,
-  x: i32,
-  y: i32,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct FocusAssistStatePayload {
-  active: bool,
-  profile: String,
-  checked_at: u64,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NotificationSummaryPayload {
-  focus_assist_active: bool,
-  checked_at: u64,
-}
-
 #[tauri::command]
 fn get_hub_event_fixtures() -> Vec<HubEventFixture> {
   build_hub_event_fixtures(0)
@@ -585,6 +359,7 @@ async fn get_media_session_status(
   sender: State<'_, MediaRequestSender>,
 ) -> Result<MediaSessionStatus, String> {
   // Clone the Arc out of State synchronously so we don't borrow across the async boundary.
+use std::sync::mpsc as std_mpsc;
   let sender_clone: MediaRequestSender = sender.inner().clone();
   let (reply_tx, reply_rx) = std_mpsc::channel();
   let tx = sender_clone
@@ -668,6 +443,7 @@ async fn media_control(
   sender: State<'_, MediaRequestSender>,
 ) -> Result<MediaControlResult, String> {
   // Clone the Arc out of State synchronously so we don't borrow across the async boundary.
+use std::sync::mpsc as std_mpsc;
   let sender_clone: MediaRequestSender = sender.inner().clone();
   let (reply_tx, reply_rx) = std_mpsc::channel();
   let tx = sender_clone
@@ -752,12 +528,6 @@ fn write_focus_assist_enabled(_enabled: bool) -> Result<(), String> {
 fn stop_focus_session() -> Result<MediaControlResult, String> {
   write_focus_assist_enabled(false)?;
   Ok(MediaControlResult { success: true })
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DownloadControlResult {
-  success: bool,
 }
 
 #[tauri::command]
@@ -1210,7 +980,6 @@ where
       std::ptr::null_mut(),
       std::ptr::null_mut(),
       std::ptr::null_mut(),
-      std::ptr::null(),
     )
   };
 
@@ -1323,162 +1092,6 @@ where
 /// reference; the active media thread runs on MTA, so the STA path is never
 /// invoked at runtime. The body remains in the source as a documented
 /// archive so future maintainers can see why MTA was chosen.
-#[cfg(windows)]
-#[allow(dead_code)]
-fn sta_wait_async<T>(
-  async_op: windows::Foundation::IAsyncOperation<T>,
-  timeout: std::time::Duration,
-) -> windows::core::Result<T>
-where
-  T: windows::core::RuntimeType + Clone + Send + 'static,
-{
-  use windows::core::Interface;
-  use windows::Foundation::{AsyncStatus, IAsyncInfo};
-
-  let info: IAsyncInfo = async_op.cast().map_err(|e| {
-    append_media_log(&format!("[wait] cast to IAsyncInfo FAILED: {e}"));
-    windows::core::Error::from(e.code())
-  })?;
-
-  // Check if already completed.
-  if let Ok(AsyncStatus::Completed) = info.Status() {
-    append_media_log("[wait] already completed");
-    return async_op.GetResults();
-  }
-
-  // Create a real hidden top-level window (NOT HWND_MESSAGE) so WinRT callbacks arrive.
-  let hwnd = unsafe {
-    let class_name: Vec<u16> = "CoberMediaWait\0".encode_utf16().collect();
-    let wc = windows_sys::Win32::UI::WindowsAndMessaging::WNDCLASSW {
-      style: 0,
-      lpfnWndProc: Some(windows_sys::Win32::UI::WindowsAndMessaging::DefWindowProcW),
-      cbClsExtra: 0,
-      cbWndExtra: 0,
-      hInstance: windows_sys::Win32::System::LibraryLoader::GetModuleHandleW(std::ptr::null()),
-      hIcon: std::ptr::null_mut(),
-      hCursor: std::ptr::null_mut(),
-      hbrBackground: std::ptr::null_mut(),
-      lpszMenuName: std::ptr::null(),
-      lpszClassName: class_name.as_ptr(),
-    };
-    windows_sys::Win32::UI::WindowsAndMessaging::RegisterClassW(&wc);
-
-    windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
-      0,
-      class_name.as_ptr(),
-      class_name.as_ptr(),
-      windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
-      0, 0, 0, 0,
-      windows_sys::Win32::UI::WindowsAndMessaging::HWND_MESSAGE, // start as message-only
-      std::ptr::null_mut(),
-      std::ptr::null_mut(),
-      std::ptr::null(),
-    )
-  };
-
-  // Upgrade to a real top-level hidden window by removing HWND_MESSAGE parent.
-  // Actually, let's just create a real WS_POPUP window off-screen.
-  unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd); }
-  let hwnd = unsafe {
-    let class_name: Vec<u16> = "CoberMediaWait\0".encode_utf16().collect();
-    windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
-      0,
-      class_name.as_ptr(),
-      class_name.as_ptr(),
-      windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
-      -32000, -32000, 1, 1,  // off-screen
-      std::ptr::null_mut(),   // no parent = top-level
-      std::ptr::null_mut(),
-      std::ptr::null_mut(),
-      std::ptr::null(),
-    )
-  };
-
-  if hwnd.is_null() {
-    append_media_log("[wait] FAILED to create hidden window, falling back to sleep");
-    // Fallback: just poll with sleep (won't work but won't crash).
-    let deadline = std::time::Instant::now() + timeout;
-    loop {
-      if let Ok(AsyncStatus::Completed) = info.Status() {
-        return async_op.GetResults();
-      }
-      if std::time::Instant::now() >= deadline {
-        return Err(windows::core::Error::from(windows::core::HRESULT(0x800705B4u32 as i32)));
-      }
-      std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-  }
-
-  append_media_log(&format!("[wait] hidden HWND={hwnd:?} created, pumping messages"));
-
-  let deadline = std::time::Instant::now() + timeout;
-  let mut msg: windows_sys::Win32::UI::WindowsAndMessaging::MSG = unsafe { std::mem::zeroed() };
-
-  loop {
-    if std::time::Instant::now() >= deadline {
-      unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd); }
-      append_media_log("[wait] TIMEOUT");
-      return Err(windows::core::Error::from(windows::core::HRESULT(0x800705B4u32 as i32)));
-    }
-
-    // Use MsgWaitForMultipleObjectsEx to wait for messages with timeout.
-    // This is the proper STA message pump pattern — it blocks until a message
-    // arrives or the timeout expires.
-    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-    let wait_ms = remaining.as_millis().min(u32::MAX as u128) as u32;
-
-    let wait_result = unsafe {
-      windows_sys::Win32::UI::WindowsAndMessaging::MsgWaitForMultipleObjectsEx(
-        0,
-        std::ptr::null(),
-        wait_ms,
-        windows_sys::Win32::UI::WindowsAndMessaging::QS_ALLINPUT,
-        windows_sys::Win32::UI::WindowsAndMessaging::MWMO_ALERTABLE,
-      )
-    };
-
-    // WAIT_OBJECT_0 (0) = messages available; WAIT_TIMEOUT (0x102) = no messages.
-    // With QS_ALLINPUT we always get a chance to drain posted WinRT completions.
-    if wait_result != 0 && wait_result != 0x00000102u32 {
-      // Unexpected result — treat as signal to re-check completion.
-    }
-
-    // Drain all pending messages from our hidden window.
-    loop {
-      let got = unsafe {
-        windows_sys::Win32::UI::WindowsAndMessaging::PeekMessageW(
-          &mut msg, hwnd, 0, 0,
-          windows_sys::Win32::UI::WindowsAndMessaging::PM_REMOVE,
-        )
-      };
-      if got == 0 {
-        break;
-      }
-      unsafe {
-        windows_sys::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
-        windows_sys::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
-      }
-    }
-
-    // Also drain thread-wide messages (WinRT completions may arrive here).
-    loop {
-      let got = unsafe {
-        windows_sys::Win32::UI::WindowsAndMessaging::PeekMessageW(
-          &mut msg, std::ptr::null_mut(), 0, 0,
-          windows_sys::Win32::UI::WindowsAndMessaging::PM_REMOVE,
-        )
-      };
-      if got == 0 {
-        break;
-      }
-      unsafe {
-        windows_sys::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
-        windows_sys::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
-      }
-    }
-  }
-}
-
 /// Legacy STA message pump kept as a documented archive. The active media
 /// thread runs on MTA (see `start_mta_media_thread` / `mta_wait_async`), so
 /// this function is no longer called at runtime.
