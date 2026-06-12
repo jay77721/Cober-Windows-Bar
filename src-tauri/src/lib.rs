@@ -262,11 +262,8 @@ const MENU_QUIT: &str = "quit";
 const TRAY_MENU_SHOW_STATUS_CENTER: &str = "tray-show-status-center";
 const TRAY_MENU_OPEN_SETTINGS: &str = "tray-open-settings";
 const GLOBAL_SHORTCUT_RECALL: &str = "Alt+Shift+Space";
-const HUB_EVENT_FIXTURE_INTERVAL: Duration = Duration::from_secs(5);
 const STATUS_WINDOW_CONFIGURED_WIDTH: u16 = 303;
 const STATUS_WINDOW_CONFIGURED_HEIGHT: u16 = 64;
-
-static HUB_EVENT_FIXTURE_TICK: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -482,7 +479,7 @@ struct NotificationSummaryPayload {
 
 #[tauri::command]
 fn get_hub_event_fixtures() -> Vec<HubEventFixture> {
-  build_hub_event_fixtures(HUB_EVENT_FIXTURE_TICK.load(Ordering::Relaxed))
+  build_hub_event_fixtures(0)
 }
 
 #[tauri::command]
@@ -1212,6 +1209,169 @@ where
       windows_sys::Win32::UI::WindowsAndMessaging::HWND_MESSAGE, // start as message-only
       std::ptr::null_mut(),
       std::ptr::null_mut(),
+      std::ptr::null_mut(),
+      std::ptr::null(),
+    )
+  };
+
+  // Upgrade to a real top-level hidden window by removing HWND_MESSAGE parent.
+  // Actually, let's just create a real WS_POPUP window off-screen.
+  unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd); }
+  let hwnd = unsafe {
+    let class_name: Vec<u16> = "CoberMediaWait\0".encode_utf16().collect();
+    windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
+      0,
+      class_name.as_ptr(),
+      class_name.as_ptr(),
+      windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
+      -32000, -32000, 1, 1,  // off-screen
+      std::ptr::null_mut(),   // no parent = top-level
+      std::ptr::null_mut(),
+      std::ptr::null_mut(),
+      std::ptr::null(),
+    )
+  };
+
+  if hwnd.is_null() {
+    append_media_log("[wait] FAILED to create hidden window, falling back to sleep");
+    // Fallback: just poll with sleep (won't work but won't crash).
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+      if let Ok(AsyncStatus::Completed) = info.Status() {
+        return async_op.GetResults();
+      }
+      if std::time::Instant::now() >= deadline {
+        return Err(windows::core::Error::from(windows::core::HRESULT(0x800705B4u32 as i32)));
+      }
+      std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+  }
+
+  append_media_log(&format!("[wait] hidden HWND={hwnd:?} created, pumping messages"));
+
+  let deadline = std::time::Instant::now() + timeout;
+  let mut msg: windows_sys::Win32::UI::WindowsAndMessaging::MSG = unsafe { std::mem::zeroed() };
+
+  loop {
+    if std::time::Instant::now() >= deadline {
+      unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd); }
+      append_media_log("[wait] TIMEOUT");
+      return Err(windows::core::Error::from(windows::core::HRESULT(0x800705B4u32 as i32)));
+    }
+
+    // Use MsgWaitForMultipleObjectsEx to wait for messages with timeout.
+    // This is the proper STA message pump pattern — it blocks until a message
+    // arrives or the timeout expires.
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    let wait_ms = remaining.as_millis().min(u32::MAX as u128) as u32;
+
+    let wait_result = unsafe {
+      windows_sys::Win32::UI::WindowsAndMessaging::MsgWaitForMultipleObjectsEx(
+        0,
+        std::ptr::null(),
+        wait_ms,
+        windows_sys::Win32::UI::WindowsAndMessaging::QS_ALLINPUT,
+        windows_sys::Win32::UI::WindowsAndMessaging::MWMO_ALERTABLE,
+      )
+    };
+
+    // WAIT_OBJECT_0 (0) = messages available; WAIT_TIMEOUT (0x102) = no messages.
+    // With QS_ALLINPUT we always get a chance to drain posted WinRT completions.
+    if wait_result != 0 && wait_result != 0x00000102u32 {
+      // Unexpected result — treat as signal to re-check completion.
+    }
+
+    // Drain all pending messages from our hidden window.
+    loop {
+      let got = unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::PeekMessageW(
+          &mut msg, hwnd, 0, 0,
+          windows_sys::Win32::UI::WindowsAndMessaging::PM_REMOVE,
+        )
+      };
+      if got == 0 {
+        break;
+      }
+      unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
+        windows_sys::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
+      }
+    }
+
+    // Also drain thread-wide messages (WinRT completions may arrive here).
+    loop {
+      let got = unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::PeekMessageW(
+          &mut msg, std::ptr::null_mut(), 0, 0,
+          windows_sys::Win32::UI::WindowsAndMessaging::PM_REMOVE,
+        )
+      };
+      if got == 0 {
+        break;
+      }
+      unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
+        windows_sys::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
+      }
+    }
+  }
+}
+
+/// STA-based fallback for waiting on WinRT async operations.
+///
+/// **Use `mta_wait_async` instead.** STA is a legacy path kept only for
+/// reference; the active media thread runs on MTA, so the STA path is never
+/// invoked at runtime. The body remains in the source as a documented
+/// archive so future maintainers can see why MTA was chosen.
+#[cfg(windows)]
+#[allow(dead_code)]
+fn sta_wait_async<T>(
+  async_op: windows::Foundation::IAsyncOperation<T>,
+  timeout: std::time::Duration,
+) -> windows::core::Result<T>
+where
+  T: windows::core::RuntimeType + Clone + Send + 'static,
+{
+  use windows::core::Interface;
+  use windows::Foundation::{AsyncStatus, IAsyncInfo};
+
+  let info: IAsyncInfo = async_op.cast().map_err(|e| {
+    append_media_log(&format!("[wait] cast to IAsyncInfo FAILED: {e}"));
+    windows::core::Error::from(e.code())
+  })?;
+
+  // Check if already completed.
+  if let Ok(AsyncStatus::Completed) = info.Status() {
+    append_media_log("[wait] already completed");
+    return async_op.GetResults();
+  }
+
+  // Create a real hidden top-level window (NOT HWND_MESSAGE) so WinRT callbacks arrive.
+  let hwnd = unsafe {
+    let class_name: Vec<u16> = "CoberMediaWait\0".encode_utf16().collect();
+    let wc = windows_sys::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+      style: 0,
+      lpfnWndProc: Some(windows_sys::Win32::UI::WindowsAndMessaging::DefWindowProcW),
+      cbClsExtra: 0,
+      cbWndExtra: 0,
+      hInstance: windows_sys::Win32::System::LibraryLoader::GetModuleHandleW(std::ptr::null()),
+      hIcon: std::ptr::null_mut(),
+      hCursor: std::ptr::null_mut(),
+      hbrBackground: std::ptr::null_mut(),
+      lpszMenuName: std::ptr::null(),
+      lpszClassName: class_name.as_ptr(),
+    };
+    windows_sys::Win32::UI::WindowsAndMessaging::RegisterClassW(&wc);
+
+    windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
+      0,
+      class_name.as_ptr(),
+      class_name.as_ptr(),
+      windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
+      0, 0, 0, 0,
+      windows_sys::Win32::UI::WindowsAndMessaging::HWND_MESSAGE, // start as message-only
+      std::ptr::null_mut(),
+      std::ptr::null_mut(),
       std::ptr::null(),
     )
   };
@@ -1497,7 +1657,7 @@ fn build_hub_event_fixtures(tick: u64) -> Vec<HubEventFixture> {
         "id": "tauri-fixture-download-task",
         "type": "download",
         "title": "Downloads queue",
-        "subtitle": format!("Fixture refresh {}s cadence", HUB_EVENT_FIXTURE_INTERVAL.as_secs()),
+        "subtitle": "Fixture refresh 5s cadence".to_string(),
         "progress": download_progress,
         "accent": "emerald"
       }),

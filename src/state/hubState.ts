@@ -78,7 +78,7 @@ function eventToTask(event: HubEvent): HubTask {
           ? 0
           : undefined
         : clampProgress(event.progress),
-    accent: taskAccentMap[event.type],
+    accent: taskAccentMap[event.type] ?? "blue",
   };
 }
 
