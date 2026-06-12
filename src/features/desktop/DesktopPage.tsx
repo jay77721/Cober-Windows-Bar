@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDesktopStatusShellCopy } from "../../data/desktopStatusConfig";
-import {
-  correctStatusWindowPosition,
-  scheduleOverlayStartupReassert,
-  STATUS_WINDOW_CORRECT_POSITION_COMMAND,
-} from "../../runtime/statusWindowRuntime";
 import { emitTauriFixtureEvents, getTauriInvoke } from "../../runtime/tauriRuntime";
 import { getAutostartEnabled, setAutostartEnabled as applyAutostart } from "../../runtime/autostartRuntime";
 import { resolveDesktopStatusState } from "../../state/desktopStatusState";
@@ -17,7 +12,9 @@ import {
   useDragController,
   useOverlayPolicy,
   usePreferences,
+  useSettingsActions,
   useSystemPerformance,
+  useWindowLifecycle,
 } from "./hooks";
 import { ClipboardStatusTemplate } from "./templates/ClipboardStatusTemplate";
 import { DownloadStatusTemplate } from "./templates/DownloadStatusTemplate";
@@ -29,7 +26,6 @@ import { UpdateStatusTemplate } from "./templates/UpdateStatusTemplate";
 
 const STATUS_CENTER_CONTEXT_MENU_COMMAND = "show_status_center_context_menu";
 const OPEN_STATUS_CENTER_SETTINGS_COMMAND = "open_status_center_settings";
-const SHOW_STATUS_CENTER_WINDOW_COMMAND = "show_status_center_window";
 
 function renderDesktopStatusTemplate(state: ReturnType<typeof resolveDesktopStatusState>) {
   switch (state.kind) {
@@ -73,7 +69,7 @@ export function DesktopPage() {
   const { isDraggingRef, lockPositionRef, handlePointerDown } = useDragController();
 
   // System performance polling
-  const { metrics, diagnostic, metricsRef, diagnosticRef, refreshMetrics } = useSystemPerformance();
+  const { metrics, diagnostic, refreshMetrics } = useSystemPerformance();
 
   // Desktop status runtime + aggregation + state resolution
   // Unified Provider pipeline handles media, clipboard, focus, and system perf.
@@ -101,6 +97,24 @@ export function DesktopPage() {
   const { overlayStateRef } = useOverlayPolicy({
     avoidFullscreen: preferences.avoidFullscreen,
     isDraggingRef,
+  });
+
+  // Settings actions (preference toggles + menu forwarding)
+  const {
+    toggleAlwaysFloat,
+    toggleAvoidFullscreen,
+    toggleLockPosition,
+    toggleFromMenu,
+  } = useSettingsActions({
+    preferences,
+    updatePreferences,
+    overlayStateRef,
+    isDraggingRef,
+  });
+
+  // Window lifecycle (reset, quit, recall)
+  const { resetPosition, quitStatusCenter, recallStatusCenter } = useWindowLifecycle({
+    appWindowRef,
   });
 
   // Preferred kind timer expiry
@@ -136,7 +150,7 @@ export function DesktopPage() {
     }
 
     await Promise.all([refreshMetrics(), refreshRuntime()]);
-  }, [refreshMetrics, refreshRuntime]);
+  }, [refreshMetrics, refreshRuntime, isDraggingRef]);
 
   const showNativeContextMenu = useCallback(async (x: number, y: number) => {
     const invoke = getTauriInvoke();
@@ -145,16 +159,7 @@ export function DesktopPage() {
     }
 
     await invoke(STATUS_CENTER_CONTEXT_MENU_COMMAND, { x, y });
-  }, []);
-
-  const resetPosition = useCallback(async () => {
-    const invoke = getTauriInvoke();
-    if (!invoke) {
-      return;
-    }
-
-    await invoke(STATUS_WINDOW_CORRECT_POSITION_COMMAND);
-  }, []);
+  }, [isDraggingRef]);
 
   const openSettings = useCallback(() => {
     setSettingsOpen(true);
@@ -167,25 +172,7 @@ export function DesktopPage() {
   const handleKindSelect = useCallback((kind: DesktopStatusKind) => {
     setActiveStatusKind(kind);
     setPreferredUntil(Date.now() + preferredWindowMs);
-  }, [preferredWindowMs]);
-
-  const toggleAlwaysFloat = useCallback(async () => {
-    await updatePreferences({ alwaysFloat: !preferences.alwaysFloat });
-  }, [preferences.alwaysFloat, updatePreferences]);
-
-  const toggleAvoidFullscreen = useCallback(() => {
-    void updatePreferences({ avoidFullscreen: !preferences.avoidFullscreen });
-    scheduleOverlayStartupReassert(overlayStateRef.current);
-  }, [preferences.avoidFullscreen, updatePreferences, overlayStateRef]);
-
-  const toggleLockPosition = useCallback(() => {
-    const nextValue = !preferences.lockPosition;
-    void updatePreferences({ lockPosition: nextValue });
-
-    if (nextValue) {
-      isDraggingRef.current = false;
-    }
-  }, [preferences.lockPosition, updatePreferences]);
+  }, [preferredWindowMs, setActiveStatusKind, setPreferredUntil]);
 
   const toggleAutostart = useCallback(async () => {
     const nextValue = !autostartEnabled;
@@ -195,42 +182,16 @@ export function DesktopPage() {
     }
   }, [autostartEnabled]);
 
-  const quitStatusCenter = useCallback(async () => {
-    const invoke = getTauriInvoke();
-    if (!invoke) {
-      await appWindowRef.current?.hide();
-      return;
-    }
-
-    try {
-      await invoke("quit_status_center");
-    } catch {
-      await appWindowRef.current?.hide();
-    }
-  }, []);
-
   const handleMenuAction = useCallback(async (action: string, checked?: boolean) => {
     switch (action) {
       case "refresh-data":
         await refresh();
         return;
       case "toggle-always-float":
-        if (typeof checked === "boolean") {
-          await updatePreferences({ alwaysFloat: checked });
-        }
-        return;
       case "toggle-avoid-fullscreen":
-        if (typeof checked === "boolean") {
-          void updatePreferences({ avoidFullscreen: checked });
-          scheduleOverlayStartupReassert(overlayStateRef.current);
-        }
-        return;
       case "toggle-lock-position":
         if (typeof checked === "boolean") {
-          void updatePreferences({ lockPosition: checked });
-          if (checked) {
-            isDraggingRef.current = false;
-          }
+          toggleFromMenu(action, checked);
         }
         return;
       case "reset-position":
@@ -243,7 +204,7 @@ export function DesktopPage() {
         await quitStatusCenter();
         return;
     }
-  }, [refresh, updatePreferences, overlayStateRef, resetPosition, openSettings, quitStatusCenter]);
+  }, [refresh, toggleFromMenu, resetPosition, openSettings, quitStatusCenter]);
 
   const handleOpenSettingsClick = useCallback(async () => {
     const invoke = getTauriInvoke();
@@ -254,17 +215,6 @@ export function DesktopPage() {
 
     await invoke(OPEN_STATUS_CENTER_SETTINGS_COMMAND);
   }, [openSettings]);
-
-  const recallStatusCenter = useCallback(async () => {
-    const invoke = getTauriInvoke();
-    if (!invoke) {
-      await appWindowRef.current?.show();
-      await appWindowRef.current?.setFocus();
-      return;
-    }
-
-    await invoke(SHOW_STATUS_CENTER_WINDOW_COMMAND);
-  }, []);
 
   // Global context menu + Escape key
   useContextMenu({ settingsOpen, closeSettings, showNativeContextMenu });
