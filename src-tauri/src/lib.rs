@@ -1,4 +1,7 @@
 mod types;
+#[cfg(windows)]
+#[allow(dead_code)] // Functions exposed for tests and Tauri command handlers; some are conditionally used.
+mod window;
 pub use crate::types::*;
 
 // (Deserialize/Serialize re-exported via types)
@@ -54,7 +57,6 @@ use windows::Media::Control::{
 };
 
 #[cfg(windows)]
-
 /// Spawns a dedicated MTA (Multi-Threaded Apartment) thread for WinRT media calls.
 ///
 /// **Why MTA?**
@@ -1517,7 +1519,7 @@ fn apply_shadow_suppression(hwnd: HWND) {
     // needed or wanted.
 
     // 1. Disable Win11 rounded corners so DWM does not add its own corner shadow.
-    let corner_pref = DWMWCP_DONOTROUND as i32;
+    let corner_pref = DWMWCP_DONOTROUND;
     let _ = DwmSetWindowAttribute(
       hwnd,
       DWMWA_WINDOW_CORNER_PREFERENCE as u32,
@@ -1526,12 +1528,12 @@ fn apply_shadow_suppression(hwnd: HWND) {
     );
 
     // 2. Disable system backdrop type (Mica/Acrylic) that can cause shadow
-    let backdrop = DWMSBT_NONE as i32;
+    let backdrop = DWMSBT_NONE;
     let _ = DwmSetWindowAttribute(
       hwnd,
-      DWMWA_SYSTEMBACKDROP_TYPE as u32,
-      &backdrop as *const i32 as *const _,
-      std::mem::size_of::<i32>() as u32,
+      DWMWA_SYSTEMBACKDROP_TYPE,
+      &backdrop as *const u32 as *const _,
+      std::mem::size_of::<u32>() as u32,
     );
 
     // NOTE: We deliberately do NOT call SetWindowCompositionAttribute with an
@@ -1918,8 +1920,8 @@ pub fn run() {
           if let Some(monitor) = monitors.first() {
             let work_area = monitor.work_area();
             let scale = monitor.scale_factor();
-            let window_width = ((303.0 * scale) as i32).min(i32::MAX);
-            let window_height = ((64.0 * scale) as i32).min(i32::MAX);
+            let window_width = (303.0 * scale) as i32;
+            let window_height = (64.0 * scale) as i32;
             let margin = (STATUS_WINDOW_EDGE_MARGIN as f64 * scale) as i32;
             let x = work_area.position.x + work_area.size.width as i32 - window_width - margin;
             let y = work_area.position.y + work_area.size.height as i32 - window_height - margin;

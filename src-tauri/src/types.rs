@@ -74,18 +74,10 @@ pub struct NetworkSample {
   pub sampled_at: std::time::Instant,
 }
 
+#[derive(Default)]
 pub struct SystemPerformanceCache {
   pub networks: Option<Networks>,
   pub network_sample: Option<NetworkSample>,
-}
-
-impl Default for SystemPerformanceCache {
-  fn default() -> Self {
-    Self {
-      networks: None,
-      network_sample: None,
-    }
-  }
 }
 
 pub struct DesktopProductState<R: tauri::Runtime> {
