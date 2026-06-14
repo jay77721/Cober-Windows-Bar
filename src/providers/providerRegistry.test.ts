@@ -761,4 +761,321 @@ describe("providerRegistry.test", () => {
     assert.equal("mode" in (record ?? {}), false);
     assert.equal("finalHubMode" in (record ?? {}), false);
   });
+
+  // listProvidersByKind -----------------------------------------------------
+
+  test("listProvidersByKind returns providers matching the kind", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const music = createMockMusicProvider();
+    const ai = createMockAIProvider();
+
+    registry.register(music);
+    registry.register(ai);
+
+    // Act
+    const records = registry.listProvidersByKind("music");
+
+    // Assert
+    assert.deepEqual(
+      records.map((r) => r.id),
+      [music.id],
+    );
+    assert.equal(records[0]?.kind, "music");
+  });
+
+  test("listProvidersByKind returns empty array for unknown kind", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+
+    registry.register(createMockMusicProvider());
+    registry.register(createMockAIProvider());
+
+    // Act
+    const records = registry.listProvidersByKind("clipboard");
+
+    // Assert
+    assert.deepEqual(records, []);
+  });
+
+  test("listProvidersByKind returns multiple providers of same kind in registration order", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const first = providerWithSpies("alpha-music-provider", "Stopped", "Healthy");
+    const second = providerWithSpies("beta-music-provider", "Stopped", "Healthy");
+
+    first.provider.metadata = { ...first.provider.metadata, kind: "music" };
+    second.provider.metadata = { ...second.provider.metadata, kind: "music" };
+
+    registry.register(first.provider);
+    registry.register(second.provider);
+
+    // Act
+    const records = registry.listProvidersByKind("music");
+
+    // Assert
+    assert.deepEqual(
+      records.map((r) => r.id),
+      ["alpha-music-provider", "beta-music-provider"],
+    );
+    assert.deepEqual(
+      records.map((r) => r.registrationOrder),
+      [0, 1],
+    );
+  });
+
+  // listRealProviders -------------------------------------------------------
+
+  test("listRealProviders returns providers that have at least one real or native capability", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const real = providerWithSpies("real-music-provider");
+    const native = providerWithSpies("native-ai-provider");
+    const mock = providerWithSpies("mock-notification-provider");
+
+    real.provider.metadata = { ...real.provider.metadata, kind: "music" };
+    real.provider.capabilities = [
+      { id: "music", kind: "music", origin: "real", support: "available" },
+    ];
+
+    native.provider.metadata = { ...native.provider.metadata, kind: "ai" };
+    native.provider.capabilities = [
+      { id: "ai", kind: "ai", origin: "native", support: "preflight" },
+    ];
+
+    mock.provider.metadata = { ...mock.provider.metadata, kind: "notification" };
+    mock.provider.capabilities = [
+      { id: "notification", kind: "notification", origin: "mock", support: "available" },
+    ];
+
+    registry.register(real.provider);
+    registry.register(native.provider);
+    registry.register(mock.provider);
+
+    // Act
+    const realRecords = registry.listRealProviders();
+
+    // Assert
+    assert.deepEqual(
+      realRecords.map((r) => r.id),
+      ["real-music-provider", "native-ai-provider"],
+    );
+  });
+
+  test("listRealProviders returns empty when only mock providers are registered", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    registry.register(createMockMusicProvider());
+    registry.register(createMockAIProvider());
+
+    // Act
+    const records = registry.listRealProviders();
+
+    // Assert
+    assert.deepEqual(records, []);
+  });
+
+  // listMockProviders -------------------------------------------------------
+
+  test("listMockProviders returns providers whose capabilities are all mock", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    registry.register(createMockMusicProvider());
+    registry.register(createMockAIProvider());
+    registry.register(createMockDownloadProvider());
+
+    // Act
+    const records = registry.listMockProviders();
+
+    // Assert
+    assert.deepEqual(
+      records.map((r) => r.id),
+      ["mock-music-provider", "mock-ai-task-provider", "mock-download-provider"],
+    );
+  });
+
+  test("listMockProviders excludes providers that have any real or native capability", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const mixed = providerWithSpies("mixed-mock-real-provider");
+
+    mixed.provider.metadata = { ...mixed.provider.metadata, kind: "music" };
+    mixed.provider.capabilities = [
+      { id: "music", kind: "music", origin: "mock", support: "available" },
+      { id: "music-secondary", kind: "music", origin: "real", support: "available" },
+    ];
+
+    registry.register(createMockMusicProvider());
+    registry.register(mixed.provider);
+
+    // Act
+    const records = registry.listMockProviders();
+
+    // Assert
+    assert.deepEqual(
+      records.map((r) => r.id),
+      ["mock-music-provider"],
+    );
+  });
+
+  // listAvailableCapabilities -----------------------------------------------
+
+  test("listAvailableCapabilities returns empty array for empty registry", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+
+    // Act
+    const records = registry.listAvailableCapabilities();
+
+    // Assert
+    assert.deepEqual(records, []);
+  });
+
+  test("listAvailableCapabilities returns only capabilities whose support is available", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const nativePreflight = providerWithSpies("native-music-preflight");
+    const nativeUnsupported = providerWithSpies("native-music-unsupported");
+    const mockAvailable = createMockMusicProvider();
+
+    nativePreflight.provider.metadata = {
+      ...nativePreflight.provider.metadata,
+      name: "Native Music Preflight",
+      mock: false,
+    };
+    nativePreflight.provider.capabilities = [
+      { ...musicCapabilityPreflightDescriptor },
+    ];
+
+    nativeUnsupported.provider.metadata = {
+      ...nativeUnsupported.provider.metadata,
+      name: "Native Music Unsupported",
+      mock: false,
+      kind: "ai",
+    };
+    nativeUnsupported.provider.capabilities = [
+      {
+        id: "ai",
+        kind: "ai",
+        origin: "native",
+        support: "unsupported",
+      },
+    ];
+
+    registry.register(nativePreflight.provider);
+    registry.register(nativeUnsupported.provider);
+    registry.register(mockAvailable);
+
+    // Act
+    const records = registry.listAvailableCapabilities();
+
+    // Assert
+    assert.equal(records.length, 1);
+    assert.equal(records[0]?.providerId, "mock-music-provider");
+    assert.equal(records[0]?.capability.support, "available");
+  });
+
+  test("listAvailableCapabilities includes all available capabilities across providers", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const realAvailable = providerWithSpies("real-music-provider");
+    const mockAvailable = createMockMusicProvider();
+    const mockAiAvailable = createMockAIProvider();
+
+    realAvailable.provider.metadata = { ...realAvailable.provider.metadata, kind: "music" };
+    realAvailable.provider.capabilities = [
+      { id: "music", kind: "music", origin: "real", support: "available" },
+    ];
+
+    registry.register(realAvailable.provider);
+    registry.register(mockAvailable);
+    registry.register(mockAiAvailable);
+
+    // Act
+    const records = registry.listAvailableCapabilities();
+
+    // Assert
+    assert.equal(records.length, 3);
+    for (const record of records) {
+      assert.equal(record.capability.support, "available");
+    }
+    assert.deepEqual(
+      records.map((r) => r.providerId),
+      ["real-music-provider", "mock-ai-task-provider", "mock-music-provider"],
+    );
+  });
+
+  // sortByOrigin behavior ---------------------------------------------------
+
+  test("listAvailableCapabilities sorts real before native before mock regardless of registration order", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const mock = createMockMusicProvider();
+    const native = providerWithSpies("native-ai-provider");
+    const real = providerWithSpies("real-download-provider");
+
+    native.provider.metadata = { ...native.provider.metadata, kind: "ai" };
+    native.provider.capabilities = [
+      { id: "ai", kind: "ai", origin: "native", support: "available" },
+    ];
+
+    real.provider.metadata = { ...real.provider.metadata, kind: "download" };
+    real.provider.capabilities = [
+      { id: "download", kind: "download", origin: "real", support: "available" },
+    ];
+
+    // Register in order: mock, native, real
+    registry.register(mock);
+    registry.register(native.provider);
+    registry.register(real.provider);
+
+    // Act
+    const records = registry.listAvailableCapabilities();
+
+    // Assert
+    assert.deepEqual(
+      records.map((r) => r.capability.origin),
+      ["real", "native", "mock"],
+    );
+  });
+
+  test("listAvailableCapabilities sorts ties alphabetically by providerId", () => {
+    // Arrange
+    const registry = createProviderRegistry();
+    const zebra = providerWithSpies("zebra-mock-provider");
+    const alpha = providerWithSpies("alpha-mock-provider");
+    const mango = providerWithSpies("mango-mock-provider");
+
+    zebra.provider.metadata = { ...zebra.provider.metadata, kind: "music" };
+    zebra.provider.capabilities = [
+      { id: "music", kind: "music", origin: "mock", support: "available" },
+    ];
+
+    alpha.provider.metadata = { ...alpha.provider.metadata, kind: "ai" };
+    alpha.provider.capabilities = [
+      { id: "ai", kind: "ai", origin: "mock", support: "available" },
+    ];
+
+    mango.provider.metadata = { ...mango.provider.metadata, kind: "download" };
+    mango.provider.capabilities = [
+      { id: "download", kind: "download", origin: "mock", support: "available" },
+    ];
+
+    // Register in non-alphabetic order
+    registry.register(zebra.provider);
+    registry.register(alpha.provider);
+    registry.register(mango.provider);
+
+    // Act
+    const records = registry.listAvailableCapabilities();
+
+    // Assert
+    assert.deepEqual(
+      records.map((r) => r.providerId),
+      ["alpha-mock-provider", "mango-mock-provider", "zebra-mock-provider"],
+    );
+    for (const record of records) {
+      assert.equal(record.capability.origin, "mock");
+    }
+  });
 });
