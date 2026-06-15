@@ -20,7 +20,8 @@ export type HubEventSource =
   | "media"
   | "clipboard"
   | "focus"
-  | "git";
+  | "git"
+  | "docker";
 
 export type SystemPerformanceMetricId = "cpu" | "memory" | "download" | "upload";
 

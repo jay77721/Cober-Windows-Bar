@@ -4,8 +4,6 @@ mod types;
 mod window;
 pub use crate::types::*;
 
-// (Deserialize/Serialize re-exported via types)
-use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -229,7 +227,6 @@ fn execute_media_action(action: &str) -> Result<MediaControlResult, String> {
 
 const STATUS_WINDOW_EDGE_MARGIN: i32 = 8;
 const STATUS_WINDOW_LABEL: &str = "main";
-const STATUS_CENTER_HUB_EVENTS_EVENT: &str = "status-center://hub-events";
 const STATUS_CENTER_MENU_ACTION_EVENT: &str = "status-center://menu-action";
 const STATUS_CENTER_SETTINGS_EVENT: &str = "status-center://settings";
 const STATUS_CENTER_OPEN_SETTINGS_EVENT: &str = "status-center://open-settings";
@@ -250,110 +247,7 @@ const MENU_QUIT: &str = "quit";
 const TRAY_MENU_SHOW_STATUS_CENTER: &str = "tray-show-status-center";
 const TRAY_MENU_OPEN_SETTINGS: &str = "tray-open-settings";
 const GLOBAL_SHORTCUT_RECALL: &str = "Alt+Shift+Space";
-const STATUS_WINDOW_CONFIGURED_WIDTH: u16 = 303;
-const STATUS_WINDOW_CONFIGURED_HEIGHT: u16 = 64;
 
-#[tauri::command]
-fn get_hub_event_fixtures() -> Vec<HubEventFixture> {
-  build_hub_event_fixtures(0)
-}
-
-#[tauri::command]
-fn emit_hub_event_fixtures(app: tauri::AppHandle) -> Result<usize, String> {
-  let fixtures = get_hub_event_fixtures();
-  let emitted = fixtures.len();
-  emit_hub_events(&app, fixtures);
-  Ok(emitted)
-}
-
-#[tauri::command]
-fn get_runtime_capabilities() -> RuntimeCapabilities {
-  RuntimeCapabilities {
-    runtime: "tauri".into(),
-    fixture_ipc: true,
-    tray: true,
-    always_on_top: true,
-    windows_providers: true,
-    configured_shell_window: ConfiguredShellWindow {
-     configured: true,
-     title: "Cober Windows Bar".into(),
-      width: STATUS_WINDOW_CONFIGURED_WIDTH,
-      height: STATUS_WINDOW_CONFIGURED_HEIGHT,
-      min_width: STATUS_WINDOW_CONFIGURED_WIDTH,
-      min_height: STATUS_WINDOW_CONFIGURED_HEIGHT,
-     resizable: false,
-     centered: true,
-    },
-  }
-}
-
-#[tauri::command]
-async fn get_guest_provider_capabilities() -> GuestProviderCapabilitiesPayload {
-  tauri::async_runtime::spawn_blocking(|| {
-    let last_checked_at = unix_time_ms();
-    let media_capability = get_media_provider_capability(last_checked_at);
-    let focus_capability = get_focus_provider_capability(last_checked_at);
-
-    GuestProviderCapabilitiesPayload {
-      providers: vec![
-        GuestProviderCapability {
-          kind: "update",
-          quality: "unavailable",
-          code: "not-implemented",
-          safe_to_display: false,
-          last_checked_at,
-        },
-        GuestProviderCapability {
-          kind: focus_capability.kind,
-          quality: focus_capability.quality,
-          code: focus_capability.code,
-          safe_to_display: focus_capability.safe_to_display,
-          last_checked_at: focus_capability.last_checked_at,
-        },
-        GuestProviderCapability {
-          kind: media_capability.kind,
-          quality: media_capability.quality,
-          code: media_capability.code,
-          safe_to_display: media_capability.safe_to_display,
-          last_checked_at: media_capability.last_checked_at,
-        },
-        GuestProviderCapability {
-          kind: "download",
-          quality: "unavailable",
-          code: "not-implemented",
-          safe_to_display: false,
-          last_checked_at,
-        },
-        GuestProviderCapability {
-          kind: "clipboard",
-          quality: "native",
-          code: "available",
-          safe_to_display: true,
-          last_checked_at,
-        },
-      ],
-    }
-  })
-  .await
-  .unwrap_or_else(|_| GuestProviderCapabilitiesPayload { providers: vec![] })
-}
-
-fn get_focus_provider_capability(last_checked_at: u64) -> GuestProviderCapability {
-  let state = read_focus_assist_state();
-  let (quality, code) = if cfg!(windows) {
-    ("native", "available")
-  } else {
-    ("unavailable", "unsupported")
-  };
-
-  GuestProviderCapability {
-    kind: "focus",
-    quality,
-    code,
-    safe_to_display: cfg!(windows),
-    last_checked_at: state.checked_at.max(last_checked_at),
-  }
-}
 
 #[cfg(windows)]
 #[tauri::command]
@@ -844,20 +738,6 @@ fn sample_network_speeds(state: &SharedDesktopProductState<tauri::Wry>) -> (u64,
   (download_bps, upload_bps)
 }
 
-#[cfg(windows)]
-fn get_media_provider_capability(last_checked_at: u64) -> GuestProviderCapability {
-  // On Windows the STA media thread handles all WinRT calls.
-  // The capability is always "native" — actual read failures are reported
-  // via the monitor's event stream (code field in MediaSessionStatus).
-  GuestProviderCapability {
-    kind: "media",
-    quality: "native",
-    code: "available",
-    safe_to_display: true,
-    last_checked_at,
-  }
-}
-
 fn read_media_session_status() -> MediaSessionStatus {
   read_media_session_status_at(unix_time_ms())
 }
@@ -898,33 +778,6 @@ fn read_media_session_status_at(checked_at: u64) -> MediaSessionStatus {
   }
 }
 
-/// Wait for a WinRT `IAsyncOperation` to complete.
-#[cfg(windows)]
-#[allow(dead_code)]
-fn mta_wait_async<T>(async_op: windows::Foundation::IAsyncOperation<T>, timeout: std::time::Duration) -> windows::core::Result<T>
-where
-  T: windows::core::RuntimeType + Clone + Send + 'static,
-{
-  use std::sync::mpsc as std_mpsc;
-  let (tx, rx) = std_mpsc::channel::<windows::core::Result<T>>();
-  // Run GetResults() on a worker so the caller can apply a hard timeout.
-  // The worker keeps running until GetResults() returns, but the caller's
-  // monitor thread is unblocked immediately on timeout.
-  std::thread::Builder::new()
-    .name("winrt-await".into())
-    .spawn(move || {
-      let result = async_op.GetResults();
-      let _ = tx.send(result);
-    })
-    .expect("failed to spawn WinRT await worker");
-  match rx.recv_timeout(timeout) {
-    Ok(result) => result,
-    Err(_) => {
-      append_media_log("[wait] TIMEOUT");
-      Err(windows::core::Error::from(windows::core::HRESULT(0x800705B4u32 as i32)))
-    }
-  }
-}
 
 /// STA-based fallback for waiting on WinRT async operations.
 ///
@@ -1088,52 +941,6 @@ where
   }
 }
 
-/// STA-based fallback for waiting on WinRT async operations.
-///
-/// **Use `mta_wait_async` instead.** STA is a legacy path kept only for
-/// reference; the active media thread runs on MTA, so the STA path is never
-/// invoked at runtime. The body remains in the source as a documented
-/// archive so future maintainers can see why MTA was chosen.
-/// Legacy STA message pump kept as a documented archive. The active media
-/// thread runs on MTA (see `start_mta_media_thread` / `mta_wait_async`), so
-/// this function is no longer called at runtime.
-#[cfg(windows)]
-#[allow(dead_code)]
-fn pump_sta_messages(ms: u32) {
-  use windows_sys::Win32::UI::WindowsAndMessaging::{
-    PeekMessageW, TranslateMessage, DispatchMessageW, MSG,
-    PM_REMOVE, WM_QUIT,
-  };
-
-  let deadline = std::time::Instant::now() + std::time::Duration::from_millis(ms as u64);
-  let mut msg: MSG = unsafe { std::mem::zeroed() };
-
-  loop {
-    if std::time::Instant::now() >= deadline {
-      break;
-    }
-
-    // Try PeekMessage first for responsiveness.
-    let got = unsafe {
-      PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE)
-    };
-
-    if got != 0 {
-      if msg.message == WM_QUIT {
-        break;
-      }
-      unsafe {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-      }
-    } else {
-      // No messages — brief alertable sleep so COM can process APCs.
-      unsafe {
-        windows_sys::Win32::System::Threading::SleepEx(1, windows_sys::Win32::Foundation::TRUE);
-      }
-    }
-  }
-}
 
 #[cfg(windows)]
 fn append_media_log(msg: &str) {
@@ -1226,88 +1033,6 @@ fn duration_100ns_to_ms(value: i64) -> Option<u64> {
   Some((value as u64) / 10_000)
 }
 
-fn build_hub_event_fixtures(tick: u64) -> Vec<HubEventFixture> {
-  let now_ms = unix_time_ms();
-  let ai_progress = 35 + ((tick * 11) % 55) as u8;
-  let download_progress = 18 + ((tick * 17) % 70) as u8;
-  let cpu_hint = 24 + ((tick * 9) % 58) as u8;
-  let accent = match tick % 3 {
-    0 => "blue",
-    1 => "violet",
-    _ => "cyan",
-  };
-
-  vec![
-    HubEventFixture {
-      id: "tauri-fixture-ai-task".into(),
-      event_type: "ai".into(),
-      source: "mock".into(),
-      created_at: now_ms.saturating_sub(1_500),
-      expires_at: Some(now_ms + 15_000),
-      progress: Some(ai_progress),
-      payload: json!({
-        "id": "tauri-fixture-ai-task",
-        "type": "ai",
-        "title": "Tauri IPC fixture",
-        "subtitle": format!("Native fixture stream tick {}", tick),
-        "progress": ai_progress,
-        "accent": accent
-      }),
-      metadata: json!({
-        "runtime": "tauri",
-        "fixture": true,
-        "streaming": true,
-        "tick": tick,
-        "version": "0.7.0"
-      }),
-    },
-    HubEventFixture {
-      id: "tauri-fixture-download-task".into(),
-      event_type: "download".into(),
-      source: "mock".into(),
-      created_at: now_ms.saturating_sub(800),
-      expires_at: Some(now_ms + 15_000),
-      progress: Some(download_progress),
-      payload: json!({
-        "id": "tauri-fixture-download-task",
-        "type": "download",
-        "title": "Downloads queue",
-        "subtitle": "Fixture refresh 5s cadence".to_string(),
-        "progress": download_progress,
-        "accent": "emerald"
-      }),
-      metadata: json!({
-        "runtime": "tauri",
-        "fixture": true,
-        "streaming": true,
-        "tick": tick,
-        "surface": "downloads"
-      }),
-    },
-    HubEventFixture {
-      id: "tauri-fixture-notification-task".into(),
-      event_type: "notification".into(),
-      source: "system".into(),
-      created_at: now_ms,
-      expires_at: Some(now_ms + 5_000),
-      progress: None,
-      payload: json!({
-        "id": "tauri-fixture-notification-task",
-        "type": "notification",
-        "title": "System pulse",
-        "subtitle": format!("Synthetic native heartbeat at {}", now_ms),
-        "accent": "amber"
-      }),
-      metadata: json!({
-        "runtime": "tauri",
-        "fixture": true,
-        "streaming": true,
-        "tick": tick,
-        "cpuHint": cpu_hint
-      }),
-    },
-  ]
-}
 
 fn unix_time_ms() -> u64 {
   SystemTime::now()
@@ -1656,13 +1381,6 @@ fn emit_status_center_settings<R: tauri::Runtime>(
   );
 }
 
-fn emit_hub_events<R: tauri::Runtime>(app: &tauri::AppHandle<R>, events: Vec<HubEventFixture>) {
-  let _ = app.emit_to(
-    STATUS_WINDOW_LABEL,
-    STATUS_CENTER_HUB_EVENTS_EVENT,
-    StatusCenterHubEventsPayload { events },
-  );
-}
 
 fn emit_open_settings_requested<R: tauri::Runtime>(app: &tauri::AppHandle<R>, source: &'static str) {
   let _ = app.emit_to(
@@ -2022,10 +1740,6 @@ pub fn run() {
       }
     })
     .invoke_handler(tauri::generate_handler![
-      get_hub_event_fixtures,
-      emit_hub_event_fixtures,
-      get_runtime_capabilities,
-      get_guest_provider_capabilities,
       get_media_session_status,
       get_system_performance,
       get_overlay_policy,

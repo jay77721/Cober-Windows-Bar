@@ -25,7 +25,8 @@ export type HubProviderKind =
   | "focus"
   | "system"
   | "update"
-  | "git";
+  | "git"
+  | "docker";
 
 export type HubProviderMetadata = {
   id: string;

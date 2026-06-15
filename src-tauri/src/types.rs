@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc as std_mpsc;
 use std::time::Duration;
@@ -99,27 +98,6 @@ impl<R: tauri::Runtime> Default for DesktopProductState<R> {
 pub type SharedDesktopProductState<R> = Arc<Mutex<DesktopProductState<R>>>;
 
 // MediaRequest and MediaRequestSender are defined above (cfg(windows) gated).
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HubEventFixture {
-  pub id: String,
-  #[serde(rename = "type")]
-  pub event_type: String,
-  pub source: String,
-  pub created_at: u64,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub expires_at: Option<u64>,
-  pub progress: Option<u8>,
-  pub payload: Value,
-  pub metadata: Value,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusCenterHubEventsPayload {
-  pub events: Vec<HubEventFixture>,
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

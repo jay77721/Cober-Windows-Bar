@@ -138,6 +138,8 @@ describe("isHubEventSource", () => {
     expect(isHubEventSource("media")).toBe(true);
     expect(isHubEventSource("clipboard")).toBe(true);
     expect(isHubEventSource("focus")).toBe(true);
+    expect(isHubEventSource("git")).toBe(true);
+    expect(isHubEventSource("docker")).toBe(true);
   });
 
   it("returns false for unknown event sources", () => {

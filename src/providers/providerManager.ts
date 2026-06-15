@@ -7,6 +7,7 @@ import {
 import { connectProviderToEventBus, type ProviderConnection } from "./providerAdapter";
 import { createProviderRegistry } from "./providerRegistry";
 import { createRealClipboardProvider } from "./realClipboardProvider";
+import { createRealDockerProvider } from "./realDockerProvider";
 import { createRealDownloadProvider } from "./realDownloadProvider";
 import { createRealFocusProvider } from "./realFocusProvider";
 import { createRealGitProvider } from "./realGitProvider";
@@ -63,14 +64,15 @@ export function createProviderManager(
     }
   }
 
-  // Register real providers (Tauri-backed). All seven real providers
-  // (clipboard, download, focus, git, media session, system performance,
+  // Register real providers (Tauri-backed). All eight real providers
+  // (clipboard, docker, download, focus, git, media session, system performance,
   // update) go through the unified Provider pipeline. The previous
   // direct-listener path for media in useDesktopStatusRuntime has been
   // removed; media events now flow provider → adapter → HubEventBus →
   // store → aggregation, just like every other guest kind.
   if (realProviders) {
     registerProvider(createRealClipboardProvider());
+    registerProvider(createRealDockerProvider());
     registerProvider(createRealDownloadProvider());
     registerProvider(createRealFocusProvider());
     registerProvider(createRealGitProvider());

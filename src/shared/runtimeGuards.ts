@@ -59,6 +59,8 @@ const HUB_EVENT_SOURCES = new Set([
   "media",
   "clipboard",
   "focus",
+  "git",
+  "docker",
 ]);
 
 export function isHubEventType(value: unknown): value is HubEvent["type"] {
